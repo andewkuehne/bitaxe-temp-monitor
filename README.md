@@ -51,11 +51,12 @@ python3 bitaxe_temp_monitor.py <bitaxe_ip> [options]
 - `-f, --frequency`: Initial frequency in MHz (default: 600)
 - `-t, --target_temp`: Target CPU temperature in °C (default: 60)
 - `-i, --interval`: Monitoring sample interval in seconds (default: 5)
+- `-p, --power_limit`: Power supply wattage limit in watts (default: 30W)
 
 #### Example
 
 ```bash
-python3 bitaxe_temp_monitor.py 192.168.2.26 -v 1150 -f 500 -t 60 -i 15
+python3 bitaxe_temp_monitor.py 192.168.2.26 -v 1150 -f 500 -t 60 -i 5 -p 30
 ```
 
 ## How It Works
