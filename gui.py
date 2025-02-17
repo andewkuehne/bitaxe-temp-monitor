@@ -14,6 +14,7 @@ class BitaxeGammaAutotuningApp:
         # IP Address Entry
         tk.Label(self.root, text="Enter IPs (space-separated):").grid(row=0, column=0)
         self.ip_entry = tk.Entry(self.root, width=50)
+        self.ip_entry.insert(0, "192.168.0.101")
         self.ip_entry.grid(row=0, column=1, columnspan=2)
 
         # Voltage Entry

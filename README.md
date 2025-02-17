@@ -4,7 +4,7 @@ This project contains a Python script that continuously monitors a Bitaxe Gamma 
 
 ## Overview
 
-The Bitaxe Gamma auto-tuningr and Auto-Tuner script continuously polls the Bitaxe's `/api/system/info` endpoint to read current temperature, hash rate, and voltage. Based on a configurable target temperature (default is 60°C) and a defined temperature margin, the script automatically adjusts:
+The Bitaxe Gamma Autotuner and Auto-Tuner script continuously polls the Bitaxe's `/api/system/info` endpoint to read current temperature, hash rate, and voltage. Based on a configurable target temperature (default is 60°C) and a defined temperature margin, the script automatically adjusts:
 
 - **Frequency**: Decreases frequency if the temperature exceeds the target or increases if the temperature is well below the target.
 - **Voltage**: If frequency adjustments alone are insufficient or if the settings are at their limits, voltage is also adjusted within safe operating ranges.
@@ -41,12 +41,12 @@ The script aims to maximize the device's hash rate while preventing overheating,
 Run the script by providing the IP address of your Bitaxe. You can also specify initial voltage, frequency, target temperature, and autotuning interval.
 
 ```bash
-python3 bitaxe-temp-auto-tuner.py <bitaxe_ip> [options]
+python3 bitaxe-temp-auto-tuner.py <bitaxeIp> [options]
 ```
 
 ### Command-Line Options
 
-- `<bitaxe_ip>`: IP address of the Bitaxe (e.g., `192.168.2.26`)
+- `<bitaxeIp>`: IP address of the Bitaxe (e.g., `192.168.2.26`)
 - `-v, --voltage`: Initial core voltage in mV (default: 1150)
 - `-f, --frequency`: Initial frequency in MHz (default: 600)
 - `-t, --target_temp`: Target CPU temperature in °C (default: 60)
