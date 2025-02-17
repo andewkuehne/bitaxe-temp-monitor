@@ -32,7 +32,7 @@ class BitaxeGammaAutotuningApp:
         # Target Temperature Entry
         tk.Label(self.root, text="Target Temp (°C):").grid(row=2, column=0)
         self.target_temp_entry = tk.Entry(self.root, width=10)
-        self.target_temp_entry.insert(0, "50")
+        self.target_temp_entry.insert(0, "60")
         self.target_temp_entry.grid(row=2, column=1)
 
         # autotuning Interval Entry
