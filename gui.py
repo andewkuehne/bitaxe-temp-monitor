@@ -71,17 +71,27 @@ class BitaxeGammaAutotuningApp:
         self.log_output.tag_config(level, foreground=colors[level])
         self.log_output.yview(tk.END)
 
+    def validate_input(self, value, default):
+        """Validates user input to ensure it's a number, otherwise returns a default value."""
+        try:
+            return int(value)
+        except ValueError:
+            self.log_message(f"Invalid input detected. Using default: {default}", "warning")
+            return default  # Return safe fallback if input is invalid
+
     def start_autotuning(self):
-        """Starts autotuning miners."""
+        """Starts autotuning miners with validated inputs."""
         self.running = True
         self.autotuning_status.clear()
         self.threads.clear()
 
         ip_addresses = self.ip_entry.get().split()
-        voltage, frequency = int(self.voltage_entry.get()), int(self.frequency_entry.get())
-        target_temp, interval = int(self.target_temp_entry.get()), int(self.interval_entry.get())
-        power_limit = int(self.power_limit_entry.get())
-        min_hashrate = int(self.min_hashrate_entry.get())  # Retrieve Min Hashrate value
+        voltage = self.validate_input(self.voltage_entry.get(), 1150)
+        frequency = self.validate_input(self.frequency_entry.get(), 525)
+        target_temp = self.validate_input(self.target_temp_entry.get(), 60)
+        interval = self.validate_input(self.interval_entry.get(), 5)
+        power_limit = self.validate_input(self.power_limit_entry.get(), 25)
+        min_hashrate = self.validate_input(self.min_hashrate_entry.get(), 1600)  # Validate new min hashrate input
 
         self.log_message(f"Starting autotuning for: {', '.join(ip_addresses)}", "success")
 
