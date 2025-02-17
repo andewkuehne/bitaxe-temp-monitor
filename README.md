@@ -73,6 +73,15 @@ python main.py
 
 Contributions, bug reports, and feature requests are welcome! Feel free to open an issue or submit a pull request.
 
+## Inspirational  Shoutouts
+
+The benchmark tool is awesome and a highly recommend tool to baseline and set and forget your miner. 
+
+1. **WhiteyCookie**: Bitaxe-Hashrate-Benchmark
+      - https://github.com/WhiteyCookie/Bitaxe-Hashrate-Benchmark
+2. **mrv777**: forked bitaxe-hashrate-benchmark
+   -    https://github.com/mrv777/bitaxe-hashrate-benchmark
+
 ## License
 
 This project is licensed under the [MIT License](LICENSE).
