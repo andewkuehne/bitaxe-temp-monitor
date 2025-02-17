@@ -77,7 +77,7 @@ python3 bitaxe_temp_monitor.py 192.168.2.26 -v 1150 -f 500 -t 60 -i 5 -p 30
 
 Contributions, bug reports, and feature requests are welcome! Feel free to open an issue or submit a pull request.
 
-## Inspration Shoutouts
+## Inspirational  Shoutouts
 
 The benchmark tool is awesome and a highly recommend tool to baseline and set and forget your miner. 
 
