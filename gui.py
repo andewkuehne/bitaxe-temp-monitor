@@ -1,12 +1,12 @@
 import tkinter as tk
 from tkinter import scrolledtext
 import threading
-from auto-tuning import monitor_and_adjust, stop_autotuning
+from autotune import monitor_and_adjust, stop_autotuning
 
 class BitaxeGammaAutotuningApp:
     def __init__(self):
         self.root = tk.Tk()
-        self.root.title("Bitaxe Gamma auto-tuningr")
+        self.root.title("Bitaxe Gamma Autotuner")
         self.running = False
         self.threads = []
         self.autotuning_status = {}
