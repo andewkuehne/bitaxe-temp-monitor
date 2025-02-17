@@ -48,9 +48,9 @@ python3 bitaxe_temp_monitor.py <bitaxe_ip> [options]
 
 - `<bitaxe_ip>`: IP address of the Bitaxe (e.g., `192.168.2.26`)
 - `-v, --voltage`: Initial core voltage in mV (default: 1150)
-- `-f, --frequency`: Initial frequency in MHz (default: 500)
+- `-f, --frequency`: Initial frequency in MHz (default: 600)
 - `-t, --target_temp`: Target CPU temperature in °C (default: 60)
-- `-i, --interval`: Monitoring sample interval in seconds (default: 15)
+- `-i, --interval`: Monitoring sample interval in seconds (default: 5)
 
 #### Example
 
