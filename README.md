@@ -4,7 +4,7 @@ This project contains a Python script that continuously monitors a Bitaxe Gamma 
 
 ## Overview
 
-The Bitaxe Temperature Monitor and Auto-Tuner script continuously polls the Bitaxe's `/api/system/info` endpoint to read current temperature, hash rate, and voltage. Based on a configurable target temperature (default is 60°C) and a defined temperature margin, the script automatically adjusts:
+The Bitaxe Gamma Autotuner and Auto-Tuner script continuously polls the Bitaxe's `/api/system/info` endpoint to read current temperature, hash rate, and voltage. Based on a configurable target temperature (default is 60°C) and a defined temperature margin, the script automatically adjusts:
 
 - **Frequency**: Decreases frequency if the temperature exceeds the target or increases if the temperature is well below the target.
 - **Voltage**: If frequency adjustments alone are insufficient or if the settings are at their limits, voltage is also adjusted within safe operating ranges.
@@ -13,7 +13,7 @@ The script aims to maximize the device's hash rate while preventing overheating,
 
 ## Features
 
-- **Automatic Monitoring**: Continuously checks the Bitaxe's temperature and performance.
+- **Automatic autotuning**: Continuously checks the Bitaxe's temperature and performance.
 - **Dynamic Adjustment**: Adjusts frequency and voltage in real time based on the current temperature.
 - **Graceful Shutdown**: Listens for interrupt signals (Ctrl+C) and exits gracefully.
 - **Customizable Parameters**: Easily modify target temperature, sample interval, step sizes, and safe operating limits.
@@ -38,31 +38,22 @@ The script aims to maximize the device's hash rate while preventing overheating,
 
 ## Usage
 
-Run the script by providing the IP address of your Bitaxe. You can also specify initial voltage, frequency, target temperature, and monitoring interval.
+Run the script by providing the IP address of your Bitaxe. You can also specify initial voltage, frequency, target temperature, and autotuning interval.
 
 ```bash
-python3 bitaxe_temp_monitor.py <bitaxe_ip> [options]
+python main.py
 ```
-
-### Command-Line Options
-
-- `<bitaxe_ip>`: IP address of the Bitaxe (e.g., `192.168.2.26`)
-- `-v, --voltage`: Initial core voltage in mV (default: 1150)
-- `-f, --frequency`: Initial frequency in MHz (default: 600)
-- `-t, --target_temp`: Target CPU temperature in °C (default: 60)
-- `-i, --interval`: Monitoring sample interval in seconds (default: 5)
-- `-p, --power_limit`: Power supply wattage limit in watts (default: 30W)
 
 #### Example
 
 ```bash
-python3 bitaxe_temp_monitor.py 192.168.2.26 -v 1150 -f 500 -t 60 -i 5 -p 30
+python main.py
 ```
 
 ## How It Works
 
 1. **Initialization**: The script applies the initial voltage and frequency settings to the Bitaxe.
-2. **Monitoring Loop**:  
+2. **autotuning Loop**:  
    - It retrieves system data from the Bitaxe.
    - If the temperature exceeds the target, the script reduces the frequency (or voltage if necessary) to cool the system.
    - If the temperature is well below the target minus a margin, it increases the frequency (or voltage) to maximize performance.
@@ -72,6 +63,11 @@ python3 bitaxe_temp_monitor.py 192.168.2.26 -v 1150 -f 500 -t 60 -i 5 -p 30
 ## Disclaimer
 
 **WARNING:** This tool modifies hardware settings and may stress test your Bitaxe. Although safeguards are in place, running the miner outside its standard operating parameters can pose risks. Use this script at your own risk. The authors are not responsible for any damage to your hardware.
+
+## Contributors
+
+1. Birdman332 (reddit)
+   - created GUI managment features. 
 
 ## Contributing
 
