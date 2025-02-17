@@ -31,7 +31,7 @@ class BitaxeGammaAutotuningApp:
         top_frame.grid(row=0, column=0, columnspan=4, sticky="ew", padx=5, pady=5)
 
         # === Title Section === #
-        tk.Label(top_frame, text="Bitaxe Gamma Autotuner", font=("Arial", 12, "bold")).pack(side=tk.LEFT)
+        tk.Label(top_frame, text="Bitaxe Autotuner", font=("Arial", 12, "bold")).pack(side=tk.LEFT)
 
         # === Input Section === #
         input_frame = tk.Frame(self.root)
