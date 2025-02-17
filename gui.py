@@ -47,6 +47,12 @@ class BitaxeGammaAutotuningApp:
         self.power_limit_entry.insert(0, "25")
         self.power_limit_entry.grid(row=3, column=1)
 
+        # **New** Min Hash Rate Entry
+        tk.Label(self.root, text="Min Hashrate (GH/s):").grid(row=3, column=2)
+        self.min_hashrate_entry = tk.Entry(self.root, width=10)
+        self.min_hashrate_entry.insert(0, "1600")  # Default value
+        self.min_hashrate_entry.grid(row=3, column=3)
+
         # Buttons
         self.start_button = tk.Button(self.root, text="Start Autotuning", command=self.start_autotuning)
         self.start_button.grid(row=4, column=0, columnspan=2)
@@ -75,12 +81,14 @@ class BitaxeGammaAutotuningApp:
         voltage, frequency = int(self.voltage_entry.get()), int(self.frequency_entry.get())
         target_temp, interval = int(self.target_temp_entry.get()), int(self.interval_entry.get())
         power_limit = int(self.power_limit_entry.get())
+        min_hashrate = int(self.min_hashrate_entry.get())  # Retrieve Min Hashrate value
 
         self.log_message(f"Starting autotuning for: {', '.join(ip_addresses)}", "success")
 
         for ip in ip_addresses:
             self.autotuning_status[ip] = True
-            thread = threading.Thread(target=monitor_and_adjust, args=(ip, voltage, frequency, target_temp, interval, power_limit, self.log_message))
+            thread = threading.Thread(target=monitor_and_adjust, args=(
+                ip, voltage, frequency, target_temp, interval, power_limit, min_hashrate, self.log_message))
             thread.start()
             self.threads.append(thread)
 
