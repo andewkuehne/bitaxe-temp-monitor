@@ -63,10 +63,10 @@ python bitaxe_temp_monitor.py <bitaxe_ip> -p 30
 
 ## Understanding the Program
 
-✅ Monitors your miner’s temperature, hash rate, and power usage.
-✅ Adjusts voltage & frequency dynamically to optimize performance.
-✅ Maintains safe temperature levels by preventing overheating.
-✅ Ensures power usage stays within limits (default: 30W).
+- Monitors your miner’s temperature, hash rate, and power usage.
+- Adjusts voltage & frequency dynamically to optimize performance.
+- Maintains safe temperature levels by preventing overheating.
+- Ensures power usage stays within limits (default: 30W).
 
 ## Stopping the Program
 
