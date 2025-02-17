@@ -13,7 +13,7 @@ The script aims to maximize the device's hash rate while preventing overheating,
 
 ## Features
 
-- **Automatic Monitoring**: Continuously checks the Bitaxe's temperature and performance.
+- **Automatic autotuning**: Continuously checks the Bitaxe's temperature and performance.
 - **Dynamic Adjustment**: Adjusts frequency and voltage in real time based on the current temperature.
 - **Graceful Shutdown**: Listens for interrupt signals (Ctrl+C) and exits gracefully.
 - **Customizable Parameters**: Easily modify target temperature, sample interval, step sizes, and safe operating limits.
@@ -38,7 +38,7 @@ The script aims to maximize the device's hash rate while preventing overheating,
 
 ## Usage
 
-Run the script by providing the IP address of your Bitaxe. You can also specify initial voltage, frequency, target temperature, and monitoring interval.
+Run the script by providing the IP address of your Bitaxe. You can also specify initial voltage, frequency, target temperature, and autotuning interval.
 
 ```bash
 python3 bitaxe-temp-auto-tuner.py <bitaxe_ip> [options]
@@ -50,7 +50,7 @@ python3 bitaxe-temp-auto-tuner.py <bitaxe_ip> [options]
 - `-v, --voltage`: Initial core voltage in mV (default: 1150)
 - `-f, --frequency`: Initial frequency in MHz (default: 600)
 - `-t, --target_temp`: Target CPU temperature in °C (default: 60)
-- `-i, --interval`: Monitoring sample interval in seconds (default: 5)
+- `-i, --interval`: autotuning sample interval in seconds (default: 5)
 - `-p, --power_limit`: Power supply wattage limit in watts (default: 30W)
 
 #### Example
@@ -62,7 +62,7 @@ python3 bitaxe-temp-auto-tuner.py 192.168.2.26 -v 1150 -f 500 -t 60 -i 5 -p 30
 ## How It Works
 
 1. **Initialization**: The script applies the initial voltage and frequency settings to the Bitaxe.
-2. **Monitoring Loop**:  
+2. **autotuning Loop**:  
    - It retrieves system data from the Bitaxe.
    - If the temperature exceeds the target, the script reduces the frequency (or voltage if necessary) to cool the system.
    - If the temperature is well below the target minus a margin, it increases the frequency (or voltage) to maximize performance.
