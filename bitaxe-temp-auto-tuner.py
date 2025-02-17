@@ -17,10 +17,10 @@ def parse_arguments():
         description='Bitaxe Temperature Monitor and Auto-Tuner'
     )
     parser.add_argument('bitaxe_ip', help='IP address of the Bitaxe (e.g., 192.168.2.26)')
-    parser.add_argument('-v', '--voltage', type=int, default=1250,
-                        help='Initial core voltage in mV (default: 1250)')
-    parser.add_argument('-f', '--frequency', type=int, default=875,
-                        help='Initial frequency in MHz (default: 875)')
+    parser.add_argument('-v', '--voltage', type=int, default=1200,
+                        help='Initial core voltage in mV (default: 1200)')
+    parser.add_argument('-f', '--frequency', type=int, default=800,
+                        help='Initial frequency in MHz (default: 800)')
     parser.add_argument('-t', '--target_temp', type=int, default=60,
                         help='Target CPU temperature in °C (default: 60)')
     parser.add_argument('-i', '--interval', type=int, default=5,
@@ -42,9 +42,9 @@ power_limit = args.power_limit
 voltage_step = 20  # mV adjustment step
 frequency_step = 25  # MHz adjustment step
 min_allowed_voltage = 1000  # mV
-max_allowed_voltage = 1400  # mV
-min_allowed_frequency = 400  # MHz
-max_allowed_frequency = 1200  # MHz
+max_allowed_voltage = 1300  # mV
+min_allowed_frequency = 700  # MHz
+max_allowed_frequency = 900  # MHz
 
 # Flag to control main loop
 running = True
