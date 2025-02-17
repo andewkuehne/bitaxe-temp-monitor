@@ -19,6 +19,7 @@ def handle_sigint(signum, frame):
     global running
     print(RED + "\nExiting Bitaxe Monitor." + RESET)
     running = False
+    sys.exit(0)  # Immediately exits all threads
 
 signal.signal(signal.SIGINT, handle_sigint)
 
@@ -40,7 +41,7 @@ voltage_step = 10  # mV adjustment step
 frequency_step = 5  # MHz adjustment step
 min_allowed_voltage = 1000  # mV
 max_allowed_voltage = 1300  # mV
-min_allowed_frequency = 500  # MHz
+min_allowed_frequency = 650  # MHz - !!! need to keep this set decently high or else a loop may occur where voltage never steps down and only voltage does, may cause issues
 max_allowed_frequency = 1000  # MHz
 
 def get_system_info(bitaxe_ip):
@@ -81,6 +82,9 @@ def monitor_and_adjust(bitaxe_ip):
 
     while running:
         info = get_system_info(bitaxe_ip)
+        if not running:  # Ensure we exit if SIGINT is received
+            break
+        
         if info is None:
             time.sleep(sample_interval)
             continue
@@ -129,6 +133,8 @@ def monitor_and_adjust(bitaxe_ip):
             print(GREEN + f"{bitaxe_ip} -> Stable. No adjustment needed." + RESET)
 
         time.sleep(sample_interval)
+
+    print(YELLOW + f"{bitaxe_ip} -> Monitoring stopped." + RESET)
 
 if __name__ == "__main__":
     try:

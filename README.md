@@ -56,7 +56,7 @@ python3 bitaxe-temp-auto-tuner.py <bitaxe_ip> [options]
 #### Example
 
 ```bash
-python3 bitaxe_temp_monitor.py 192.168.2.26 -v 1150 -f 500 -t 60 -i 5 -p 30
+python3 bitaxe-temp-auto-tuner.py 192.168.2.26 -v 1150 -f 500 -t 60 -i 5 -p 30
 ```
 
 ## How It Works
