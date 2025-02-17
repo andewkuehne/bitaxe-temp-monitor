@@ -1,23 +1,21 @@
 import requests
 import time
+from config import load_config
 
-# ============================
-# CONFIGURATION PARAMETERS
-# ============================
-VOLTAGE_STEP = 10  # mV adjustment step
-FREQUENCY_STEP = 5  # MHz adjustment step
+# Load configuration
+config = load_config()
 
-# Voltage Limits
-MIN_ALLOWED_VOLTAGE = 1000  # mV
-MAX_ALLOWED_VOLTAGE = 1300  # mV
+VOLTAGE_STEP = config["voltage_step"]
+FREQUENCY_STEP = config["frequency_step"]
+MIN_ALLOWED_VOLTAGE = config["min_allowed_voltage"]
+MAX_ALLOWED_VOLTAGE = config["max_allowed_voltage"]
+MIN_ALLOWED_FREQUENCY = config["min_allowed_frequency"]
+MAX_ALLOWED_FREQUENCY = config["max_allowed_frequency"]
+DEFAULT_TARGET_TEMP = config["default_target_temp"]
+TEMP_TOLERANCE = config["temp_tolerance"]
+POWER_LIMIT = config["power_limit"]
+MONITOR_INTERVAL = config["monitor_interval"]
 
-# Frequency Limits
-MIN_ALLOWED_FREQUENCY = 650  # MHz
-MAX_ALLOWED_FREQUENCY = 1000  # MHz
-
-# Temperature Limits
-DEFAULT_TARGET_TEMP = 50  # °C
-TEMP_TOLERANCE = 2  # Allowable fluctuation range before adjusting
 
 # Global Running Flag
 running = True

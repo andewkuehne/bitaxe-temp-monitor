@@ -1,7 +1,7 @@
 import tkinter as tk
 from tkinter import scrolledtext
 import threading
-from autotune import monitor_and_adjust, log_message, stop_autotuning
+from autotune import monitor_and_adjust, stop_autotuning
 
 class BitaxeGammaAutotuningApp:
     def __init__(self):
@@ -54,7 +54,7 @@ class BitaxeGammaAutotuningApp:
         self.stop_button.grid(row=4, column=2, columnspan=2)
 
         # Log Output
-        self.log_output = scrolledtext.ScrolledText(self.root, width=70, height=20)
+        self.log_output = scrolledtext.ScrolledText(self.root, width=100, height=20)
         self.log_output.grid(row=5, column=0, columnspan=4)
 
     def log_message(self, message, level="info"):
