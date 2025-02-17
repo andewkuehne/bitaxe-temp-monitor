@@ -5,7 +5,7 @@
     "max_allowed_voltage": 1300,
     "min_allowed_frequency": 650,
     "max_allowed_frequency": 1000,
-    "default_target_temp": 60,
+    "default_target_temp": 50,
     "temp_tolerance": 2,
     "power_limit": 25,
     "monitor_interval": 5
