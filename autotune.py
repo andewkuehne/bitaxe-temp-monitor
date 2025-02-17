@@ -16,7 +16,6 @@ TEMP_TOLERANCE = config["temp_tolerance"]
 POWER_LIMIT = config["power_limit"]
 MONITOR_INTERVAL = config["monitor_interval"]
 
-
 # Global Running Flag
 running = True
 
@@ -30,9 +29,9 @@ def get_system_info(bitaxe_ip):
     except requests.exceptions.RequestException as e:
         return f"Error fetching system info from {bitaxe_ip}: {e}"
 
-# Set Bitaxe settings to settings from autotuning (monitor_and_adjust)
+# Set Bitaxe settings to new autotuning parameters
 def set_system_settings(bitaxe_ip, core_voltage, frequency, retries=3, delay=3):
-    """Set system parameters via Bitaxe API with retry mechanism. Retries 3x's before giving up."""
+    """Set system parameters via Bitaxe API with retry mechanism. Retries 3 times before giving up."""
     settings = {"coreVoltage": core_voltage, "frequency": frequency}
     
     for attempt in range(retries):
@@ -53,7 +52,7 @@ def monitor_and_adjust(bitaxe_ip, voltage, frequency, target_temp, interval, pow
 
     log_callback(f"Starting autotuning for {bitaxe_ip}", "success")
 
-    # Initial settings
+    # Apply initial settings
     applied_settings = set_system_settings(bitaxe_ip, current_voltage, current_frequency)
     log_callback(applied_settings, "info")
 
@@ -64,7 +63,7 @@ def monitor_and_adjust(bitaxe_ip, voltage, frequency, target_temp, interval, pow
 
         if isinstance(info, str):
             log_callback(info, "error")
-            time.sleep(interval)
+            time.sleep(interval)  # Prevent rapid retries
             continue
 
         temp, hash_rate, power_consumption = info.get("temp", 0), info.get("hashRate", 0), info.get("power", 0)
@@ -72,7 +71,7 @@ def monitor_and_adjust(bitaxe_ip, voltage, frequency, target_temp, interval, pow
 
         new_voltage, new_frequency = current_voltage, current_frequency  # Default to current settings
 
-        # **STEP-DOWN LOGIC**
+        # **STEP-DOWN LOGIC** (Reduce settings if overheating or power is too high)
         if temp is None or power_consumption > power_limit or temp > target_temp:
             log_callback(f"{bitaxe_ip} -> Overheating or Power Limit Exceeded! Lowering settings.", "error")
             if current_voltage - VOLTAGE_STEP >= MIN_ALLOWED_VOLTAGE:
@@ -80,7 +79,7 @@ def monitor_and_adjust(bitaxe_ip, voltage, frequency, target_temp, interval, pow
             elif current_frequency - FREQUENCY_STEP >= MIN_ALLOWED_FREQUENCY:
                 new_frequency -= FREQUENCY_STEP
 
-        # **STEP-UP LOGIC**
+        # **STEP-UP LOGIC** (Increase performance if safe)
         elif temp < (target_temp - 3) and power_consumption < (power_limit * 0.9):
             log_callback(f"{bitaxe_ip} -> Temp {temp}°C is low. Trying to optimize.", "warning")
             if current_frequency + FREQUENCY_STEP <= MAX_ALLOWED_FREQUENCY:
@@ -95,15 +94,20 @@ def monitor_and_adjust(bitaxe_ip, voltage, frequency, target_temp, interval, pow
                 new_voltage += VOLTAGE_STEP
             elif current_frequency + FREQUENCY_STEP <= MAX_ALLOWED_FREQUENCY:
                 new_frequency += FREQUENCY_STEP
-    
-def stop_autotuning(self):
-    """Stops autotuning miners and ensures threads are properly terminated."""
+
+        # **Apply settings only if changed**
+        if new_voltage != current_voltage or new_frequency != current_frequency:
+            log_callback(f"{bitaxe_ip} -> Applying new settings: Voltage={new_voltage}mV, Frequency={new_frequency}MHz", "info")
+            applied_settings = set_system_settings(bitaxe_ip, new_voltage, new_frequency)
+            log_callback(applied_settings, "info")
+            current_voltage, current_frequency = new_voltage, new_frequency
+
+        # Ensure loop respects the interval
+        time.sleep(interval)
+
+    log_callback(f"{bitaxe_ip} -> Autotuning stopped.", "warning")
+
+def stop_autotuning():
+    """Stops autotuning miners globally."""
     global running
     running = False  # Stop the running autotuning loop
-
-    for thread in self.threads:
-        if thread.is_alive():
-            thread.join(timeout=2)  # Give time for threads to terminate
-
-    self.threads.clear()  # Clean up thread list
-    self.log_message("Stopping autotuning...", "warning")
