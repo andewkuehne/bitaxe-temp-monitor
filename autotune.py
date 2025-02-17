@@ -71,21 +71,42 @@ def monitor_and_adjust(bitaxe_ip, voltage, frequency, target_temp, interval, pow
 
         new_voltage, new_frequency = current_voltage, current_frequency  # Default to current settings
 
-        # **STEP-DOWN LOGIC** (Reduce settings if overheating or power is too high)
-        if temp is None or power_consumption > power_limit or temp > target_temp:
-            log_callback(f"{bitaxe_ip} -> Overheating or Power Limit Exceeded! Lowering settings.", "error")
-            if current_voltage - VOLTAGE_STEP >= MIN_ALLOWED_VOLTAGE:
-                new_voltage -= VOLTAGE_STEP
-            elif current_frequency - FREQUENCY_STEP >= MIN_ALLOWED_FREQUENCY:
-                new_frequency -= FREQUENCY_STEP
+# **STEP-DOWN LOGIC** (Reduce settings if overheating or power is too high)
+if temp is None or power_consumption > power_limit or temp > target_temp:
+    log_callback(f"{bitaxe_ip} -> Overheating or Power Limit Exceeded! Lowering settings.", "error")
 
-        # **STEP-UP LOGIC** (Increase performance if safe)
-        elif temp < (target_temp - 3) and power_consumption < (power_limit * 0.9):
-            log_callback(f"{bitaxe_ip} -> Temp {temp}°C is low. Trying to optimize.", "warning")
-            if current_frequency + FREQUENCY_STEP <= MAX_ALLOWED_FREQUENCY:
-                new_frequency += FREQUENCY_STEP
-            elif current_voltage + VOLTAGE_STEP <= MAX_ALLOWED_VOLTAGE:
-                new_voltage += VOLTAGE_STEP
+    # Reduce voltage first (to lower power consumption)
+    if current_voltage - VOLTAGE_STEP >= MIN_ALLOWED_VOLTAGE:
+        new_voltage -= VOLTAGE_STEP
+        log_callback(f"{bitaxe_ip} -> Lowering voltage to {new_voltage}mV.", "warning")
+
+    # If voltage cannot go lower, then reduce frequency
+    elif current_frequency - FREQUENCY_STEP >= MIN_ALLOWED_FREQUENCY:
+        new_frequency -= FREQUENCY_STEP
+        log_callback(f"{bitaxe_ip} -> Lowering frequency to {new_frequency}MHz.", "warning")
+
+    # If voltage and frequency are already at minimum, log a warning
+    else:
+        log_callback(f"{bitaxe_ip} -> Minimum settings reached! Holding state.", "error")
+
+# **STEP-UP LOGIC** (Increase performance if safe)
+elif temp < (target_temp - 3) and power_consumption < (power_limit * 0.9):
+    log_callback(f"{bitaxe_ip} -> Temp {temp}°C is low. Trying to optimize.", "info")
+
+    # Ensure voltage is not stuck at low values
+    if current_voltage < (MAX_ALLOWED_VOLTAGE * 0.9):  
+        new_voltage += VOLTAGE_STEP
+        log_callback(f"{bitaxe_ip} -> Increasing voltage to {new_voltage}mV for stability.", "info")
+
+    # Increase frequency only when voltage is already high enough
+    elif current_frequency + FREQUENCY_STEP <= MAX_ALLOWED_FREQUENCY:
+        new_frequency += FREQUENCY_STEP
+        log_callback(f"{bitaxe_ip} -> Increasing frequency to {new_frequency}MHz.", "info")
+
+    # If already at max safe settings, log it
+    else:
+        log_callback(f"{bitaxe_ip} -> Already at maximum safe settings.", "info")
+
 
         # **HASHRATE RECOVERY & MINIMUM HASH RATE TARGET**
         elif hash_rate < min_hashrate:
