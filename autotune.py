@@ -19,6 +19,7 @@ MONITOR_INTERVAL = config["monitor_interval"]
 # Global Running Flag
 running = True
 
+
 # Get information from the Bitaxe
 def get_system_info(bitaxe_ip):
     """Fetch system info from Bitaxe API."""
@@ -29,11 +30,12 @@ def get_system_info(bitaxe_ip):
     except requests.exceptions.RequestException as e:
         return f"Error fetching system info from {bitaxe_ip}: {e}"
 
+
 # Set Bitaxe settings to new autotuning parameters
 def set_system_settings(bitaxe_ip, core_voltage, frequency, retries=3, delay=3):
     """Set system parameters via Bitaxe API with retry mechanism. Retries 3 times before giving up."""
     settings = {"coreVoltage": core_voltage, "frequency": frequency}
-    
+
     for attempt in range(retries):
         try:
             response = requests.patch(f"http://{bitaxe_ip}/api/system", json=settings, timeout=10)
@@ -45,10 +47,11 @@ def set_system_settings(bitaxe_ip, core_voltage, frequency, retries=3, delay=3):
             else:
                 return f"{bitaxe_ip} -> Error setting system settings after {retries} attempts: {e}"
 
+
 def monitor_and_adjust(bitaxe_ip, voltage, frequency, target_temp, interval, power_limit, min_hashrate, log_callback):
     """Monitor and auto-adjust miner settings for a specific IP."""
     global running
-    running = True # ensures the autotuner restarts properly if restarted
+    running = True  # Ensures the autotuner restarts properly if restarted
 
     current_voltage, current_frequency = voltage, frequency
 
@@ -67,58 +70,64 @@ def monitor_and_adjust(bitaxe_ip, voltage, frequency, target_temp, interval, pow
             continue
 
         temp, hash_rate, power_consumption = info.get("temp", 0), info.get("hashRate", 0), info.get("power", 0)
-        log_callback(f"{bitaxe_ip} -> Temp: {temp}°C | Hashrate: {int(hash_rate)} GH/s | Power: {power_consumption}W", "success")
+        log_callback(f"{bitaxe_ip} -> Temp: {temp}°C | Hashrate: {int(hash_rate)} GH/s | Power: {power_consumption}W",
+                     "success")
 
         new_voltage, new_frequency = current_voltage, current_frequency  # Default to current settings
 
-# **STEP-DOWN LOGIC** (Reduce settings if overheating or power is too high)
-if temp is None or power_consumption > power_limit or temp > target_temp:
-    log_callback(f"{bitaxe_ip} -> Overheating or Power Limit Exceeded! Lowering settings.", "error")
+        # **STEP-DOWN LOGIC** (Reduce settings if overheating or power is too high)
+        if temp is None or power_consumption > power_limit or temp > target_temp:
+            log_callback(f"{bitaxe_ip} -> Overheating or Power Limit Exceeded! Lowering settings.", "error")
 
-    # Reduce voltage first (to lower power consumption)
-    if current_voltage - VOLTAGE_STEP >= MIN_ALLOWED_VOLTAGE:
-        new_voltage -= VOLTAGE_STEP
-        log_callback(f"{bitaxe_ip} -> Lowering voltage to {new_voltage}mV.", "warning")
+            # ✅ Reduce voltage first (to lower power consumption)
+            if current_voltage - VOLTAGE_STEP >= MIN_ALLOWED_VOLTAGE:
+                new_voltage -= VOLTAGE_STEP
+                log_callback(f"{bitaxe_ip} -> Lowering voltage to {new_voltage}mV.", "warning")
 
-    # If voltage cannot go lower, then reduce frequency
-    elif current_frequency - FREQUENCY_STEP >= MIN_ALLOWED_FREQUENCY:
-        new_frequency -= FREQUENCY_STEP
-        log_callback(f"{bitaxe_ip} -> Lowering frequency to {new_frequency}MHz.", "warning")
+            # ✅ If voltage cannot go lower, then reduce frequency
+            elif current_frequency - FREQUENCY_STEP >= MIN_ALLOWED_FREQUENCY:
+                new_frequency -= FREQUENCY_STEP
+                log_callback(f"{bitaxe_ip} -> Lowering frequency to {new_frequency}MHz.", "warning")
 
-    # If voltage and frequency are already at minimum, log a warning
-    else:
-        log_callback(f"{bitaxe_ip} -> Minimum settings reached! Holding state.", "error")
+            else:
+                log_callback(f"{bitaxe_ip} -> Minimum settings reached! Holding state.", "error")
 
-# **STEP-UP LOGIC** (Increase performance if safe)
-elif temp < (target_temp - 3) and power_consumption < (power_limit * 0.9):
-    log_callback(f"{bitaxe_ip} -> Temp {temp}°C is low. Trying to optimize.", "info")
+        # **STEP-UP LOGIC** (Increase performance if safe)
+        elif temp < (target_temp - 3) and power_consumption < (power_limit * 0.9):
+            log_callback(f"{bitaxe_ip} -> Temp {temp}°C is low. Trying to optimize.", "info")
 
-    # Ensure voltage is not stuck at low values
-    if current_voltage < (MAX_ALLOWED_VOLTAGE * 0.9):  
-        new_voltage += VOLTAGE_STEP
-        log_callback(f"{bitaxe_ip} -> Increasing voltage to {new_voltage}mV for stability.", "info")
-
-    # Increase frequency only when voltage is already high enough
-    elif current_frequency + FREQUENCY_STEP <= MAX_ALLOWED_FREQUENCY:
-        new_frequency += FREQUENCY_STEP
-        log_callback(f"{bitaxe_ip} -> Increasing frequency to {new_frequency}MHz.", "info")
-
-    # If already at max safe settings, log it
-    else:
-        log_callback(f"{bitaxe_ip} -> Already at maximum safe settings.", "info")
-
-
-        # **HASHRATE RECOVERY & MINIMUM HASH RATE TARGET**
-        elif hash_rate < min_hashrate:
-            log_callback(f"{bitaxe_ip} -> Hashrate below {min_hashrate} GH/s! Adjusting settings.", "warning")
+            # ✅ Ensure voltage is not stuck at low values
             if current_voltage + VOLTAGE_STEP <= MAX_ALLOWED_VOLTAGE:
                 new_voltage += VOLTAGE_STEP
+                log_callback(f"{bitaxe_ip} -> Increasing voltage to {new_voltage}mV for stability.", "info")
+
+            # ✅ Increase frequency only when voltage is already high enough
             elif current_frequency + FREQUENCY_STEP <= MAX_ALLOWED_FREQUENCY:
                 new_frequency += FREQUENCY_STEP
+                log_callback(f"{bitaxe_ip} -> Increasing frequency to {new_frequency}MHz.", "info")
+
+            else:
+                log_callback(f"{bitaxe_ip} -> Already at maximum safe settings.", "info")
+
+        # **HASHRATE RECOVERY (Ensuring Minimum Hashrate)**
+        elif hash_rate < min_hashrate:
+            log_callback(f"{bitaxe_ip} -> Hashrate below {min_hashrate} GH/s! Adjusting settings.", "warning")
+
+            if current_voltage + VOLTAGE_STEP <= MAX_ALLOWED_VOLTAGE:
+                new_voltage += VOLTAGE_STEP
+                log_callback(f"{bitaxe_ip} -> Increasing voltage to {new_voltage}mV for hashrate recovery.", "info")
+
+            elif current_frequency + FREQUENCY_STEP <= MAX_ALLOWED_FREQUENCY:
+                new_frequency += FREQUENCY_STEP
+                log_callback(f"{bitaxe_ip} -> Increasing frequency to {new_frequency}MHz to recover hashrate.", "info")
+
+            else:
+                log_callback(f"{bitaxe_ip} -> Hashrate is low, but already at max safe settings.", "warning")
 
         # **Apply settings only if changed**
         if new_voltage != current_voltage or new_frequency != current_frequency:
-            log_callback(f"{bitaxe_ip} -> Applying new settings: Voltage={new_voltage}mV, Frequency={new_frequency}MHz", "info")
+            log_callback(f"{bitaxe_ip} -> Applying new settings: Voltage={new_voltage}mV, Frequency={new_frequency}MHz",
+                         "info")
             applied_settings = set_system_settings(bitaxe_ip, new_voltage, new_frequency)
             log_callback(applied_settings, "info")
             current_voltage, current_frequency = new_voltage, new_frequency
@@ -127,6 +136,7 @@ elif temp < (target_temp - 3) and power_consumption < (power_limit * 0.9):
         time.sleep(interval)
 
     log_callback(f"{bitaxe_ip} -> Autotuning stopped.", "warning")
+
 
 def stop_autotuning():
     """Stops autotuning miners globally."""
