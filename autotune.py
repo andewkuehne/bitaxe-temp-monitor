@@ -48,11 +48,9 @@ def set_system_settings(bitaxe_ip, core_voltage, frequency, retries=3, delay=3):
 def monitor_and_adjust(bitaxe_ip, voltage, frequency, target_temp, interval, power_limit, min_hashrate, log_callback):
     """Monitor and auto-adjust miner settings for a specific IP."""
     global running
-    running = true # ensures the autotuner restarts properly if restarted
+    running = True # ensures the autotuner restarts properly if restarted
 
     current_voltage, current_frequency = voltage, frequency
-
-    log_callback(f"Starting autotuning for {bitaxe_ip}", "success")
 
     # Apply initial settings
     applied_settings = set_system_settings(bitaxe_ip, current_voltage, current_frequency)
