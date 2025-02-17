@@ -41,22 +41,13 @@ The script aims to maximize the device's hash rate while preventing overheating,
 Run the script by providing the IP address of your Bitaxe. You can also specify initial voltage, frequency, target temperature, and autotuning interval.
 
 ```bash
-python3 bitaxe-temp-auto-tuner.py <bitaxeIp> [options]
+python main.py
 ```
-
-### Command-Line Options
-
-- `<bitaxeIp>`: IP address of the Bitaxe (e.g., `192.168.2.26`)
-- `-v, --voltage`: Initial core voltage in mV (default: 1150)
-- `-f, --frequency`: Initial frequency in MHz (default: 600)
-- `-t, --target_temp`: Target CPU temperature in °C (default: 60)
-- `-i, --interval`: autotuning sample interval in seconds (default: 5)
-- `-p, --power_limit`: Power supply wattage limit in watts (default: 30W)
 
 #### Example
 
 ```bash
-python3 bitaxe-temp-auto-tuner.py 192.168.2.26 -v 1150 -f 500 -t 60 -i 5 -p 30
+python main.py
 ```
 
 ## How It Works
@@ -72,6 +63,11 @@ python3 bitaxe-temp-auto-tuner.py 192.168.2.26 -v 1150 -f 500 -t 60 -i 5 -p 30
 ## Disclaimer
 
 **WARNING:** This tool modifies hardware settings and may stress test your Bitaxe. Although safeguards are in place, running the miner outside its standard operating parameters can pose risks. Use this script at your own risk. The authors are not responsible for any damage to your hardware.
+
+## Contributors
+
+1. Birdman332 (reddit)
+   - created GUI managment features. 
 
 ## Contributing
 
