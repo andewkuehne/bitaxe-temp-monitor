@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 import requests
 import time
 import signal
@@ -11,21 +10,25 @@ YELLOW = "\033[93m"
 RED = "\033[91m"
 RESET = "\033[0m"
 
+
 # Parse command-line arguments
 def parse_arguments():
     parser = argparse.ArgumentParser(
         description='Bitaxe Temperature Monitor and Auto-Tuner'
     )
     parser.add_argument('bitaxe_ip', help='IP address of the Bitaxe (e.g., 192.168.2.26)')
-    parser.add_argument('-v', '--voltage', type=int, default=1150,
-                        help='Initial core voltage in mV (default: 1150)')
-    parser.add_argument('-f', '--frequency', type=int, default=600,
-                        help='Initial frequency in MHz (default: 600)')
-    parser.add_argument('-t', '--target_temp', type=int, default=60,
-                        help='Target CPU temperature in °C (default: 60)')
+    parser.add_argument('-v', '--voltage', type=int, default=1250,
+                        help='Initial core voltage in mV (default: 1250)')
+    parser.add_argument('-f', '--frequency', type=int, default=875,
+                        help='Initial frequency in MHz (default: 875)')
+    parser.add_argument('-t', '--target_temp', type=int, default=65,
+                        help='Target CPU temperature in °C (default: 65)')
     parser.add_argument('-i', '--interval', type=int, default=5,
                         help='Monitoring sample interval in seconds (default: 5)')
+    parser.add_argument('-p', '--power_limit', type=int, default=30,
+                        help='Power supply wattage limit (default: 30W)')
     return parser.parse_args()
+
 
 args = parse_arguments()
 bitaxe_ip = f"http://{args.bitaxe_ip}"
@@ -33,30 +36,29 @@ current_voltage = args.voltage
 current_frequency = args.frequency
 target_temp = args.target_temp
 sample_interval = args.interval
+power_limit = args.power_limit
 
-# Configuration parameters (adjust these as needed)
-voltage_step = 20         # mV adjustment step
-frequency_step = 25       # MHz adjustment step
+# Configuration parameters
+voltage_step = 20  # mV adjustment step
+frequency_step = 25  # MHz adjustment step
 min_allowed_voltage = 1000  # mV
 max_allowed_voltage = 1400  # mV
 min_allowed_frequency = 400  # MHz
 max_allowed_frequency = 1200  # MHz
 
-# Temperature margins:
-# If temp exceeds target_temp, we step down.
-# If temp is below (target_temp - margin), we try to step up.
-temp_margin = 2
-
-# Flag to control the main loop when exiting
+# Flag to control main loop
 running = True
 
-# Signal handler to exit gracefully on Ctrl+C
+
+# Signal handler for graceful exit
 def handle_sigint(signum, frame):
     global running
-    print(RED + "\nExiting Bitaxe Monitor. No further adjustments will be made." + RESET)
+    print(RED + "\nExiting Bitaxe Monitor." + RESET)
     running = False
 
+
 signal.signal(signal.SIGINT, handle_sigint)
+
 
 def get_system_info():
     """Fetch system info from Bitaxe API."""
@@ -68,6 +70,7 @@ def get_system_info():
         print(YELLOW + f"Error fetching system info: {e}" + RESET)
         return None
 
+
 def set_system_settings(core_voltage, frequency):
     """Set system parameters via Bitaxe API."""
     settings = {
@@ -77,67 +80,65 @@ def set_system_settings(core_voltage, frequency):
     try:
         response = requests.patch(f"{bitaxe_ip}/api/system", json=settings, timeout=10)
         response.raise_for_status()
-        print(YELLOW + f"Applied settings: Voltage = {core_voltage}mV, Frequency = {frequency}MHz" + RESET)
-        # Allow some time for the system to stabilize after applying new settings.
+        print(YELLOW + f"Applying settings: Voltage = {core_voltage}mV, Frequency = {frequency}MHz" + RESET)
         time.sleep(2)
     except requests.exceptions.RequestException as e:
         print(RED + f"Error setting system settings: {e}" + RESET)
 
+
 def monitor_and_adjust():
     global current_voltage, current_frequency
-    print(GREEN + f"Starting Bitaxe Temperature Monitor. Target temp: {target_temp}°C" + RESET)
-    # Apply the initial settings once at the start
+    print(GREEN + f"Starting Bitaxe Monitor. Target temp: {target_temp}°C" + RESET)
     set_system_settings(current_voltage, current_frequency)
-    
+
     while running:
         info = get_system_info()
         if info is None:
             time.sleep(sample_interval)
             continue
 
-        # Retrieve temperature and hashrate (if available)
         temp = info.get("temp")
         hash_rate = info.get("hashRate", 0)
         voltage_reported = info.get("voltage", 0)
+        power_consumption = info.get("power", 0)
 
-        # Print current status
-        status = (f"Temp: {temp}°C | "
-                  f"Hashrate: {int(hash_rate)} GH/s | "
+        status = (f"Temp: {temp}°C | Hashrate: {int(hash_rate)} GH/s | "
+                  f"Power: {power_consumption}W | "
                   f"Voltage: {voltage_reported}mV | "
                   f"Current Settings -> Voltage: {current_voltage}mV, Frequency: {current_frequency}MHz")
         print(GREEN + status + RESET)
 
-        # Decision logic based on temperature
-        if temp is None:
-            print(YELLOW + "Temperature reading not available. Retrying..." + RESET)
-        elif temp > target_temp:
-            # Temperature is too high: decrease performance parameters.
-            print(RED + f"Temperature {temp}°C exceeds target of {target_temp}°C. Reducing settings." + RESET)
-            # Try reducing frequency first if possible.
+        if temp is None or power_consumption > power_limit:
+            print(RED + "Power limit exceeded! Lowering settings." + RESET)
             if current_frequency - frequency_step >= min_allowed_frequency:
                 current_frequency -= frequency_step
-            # If frequency is already low, reduce voltage (if possible).
             elif current_voltage - voltage_step >= min_allowed_voltage:
                 current_voltage -= voltage_step
-            else:
-                print(YELLOW + "Already at minimum allowed settings. Cannot reduce further." + RESET)
             set_system_settings(current_voltage, current_frequency)
-        elif temp < (target_temp - temp_margin):
-            # Temperature is comfortably low: try to increase performance if not at limits.
-            print(YELLOW + f"Temperature {temp}°C is well below target. Attempting to increase performance." + RESET)
-            # First, try increasing frequency if within limits.
+        elif temp > target_temp:
+            print(RED + f"Temp {temp}°C exceeds limit. Lowering settings." + RESET)
+            if current_frequency - frequency_step >= min_allowed_frequency:
+                current_frequency -= frequency_step
+            elif current_voltage - voltage_step >= min_allowed_voltage:
+                current_voltage -= voltage_step
+            set_system_settings(current_voltage, current_frequency)
+        elif temp < (target_temp - 2):
+            print(YELLOW + f"Temp {temp}°C is low. Trying to optimize." + RESET)
             if current_frequency + frequency_step <= max_allowed_frequency:
                 current_frequency += frequency_step
-            # If frequency is at max, try increasing voltage if within limits.
             elif current_voltage + voltage_step <= max_allowed_voltage:
                 current_voltage += voltage_step
-            else:
-                print(YELLOW + "Already at maximum allowed settings. No increase possible." + RESET)
             set_system_settings(current_voltage, current_frequency)
+        elif hash_rate < 1600:  # Hashrate should be close to benchmarked results
+            print(YELLOW + "Hashrate underperforming! Adjusting voltage." + RESET)
+            if current_voltage + voltage_step <= max_allowed_voltage:
+                current_voltage += voltage_step
+                set_system_settings(current_voltage, current_frequency)
         else:
-            # Temperature is within an acceptable range; no adjustment needed.
-            print(GREEN + "Temperature within acceptable range. No adjustment needed." + RESET)
+            print(GREEN + "Stable. No adjustment needed." + RESET)
+
         time.sleep(sample_interval)
+
 
 if __name__ == "__main__":
     try:
