@@ -48,17 +48,14 @@ The Bitaxe Temperature Monitor and Auto-Tuner script helps optimize your mining 
 ## Run the program using:
 
 ```bash
-python bitaxe_temp_monitor.py <bitaxe_ip> -p 30
+python main.py
 ```
-   
--(Replace <bitaxe_ip> with the actual IP address of your Bitaxe miner.)
+
 
 ## Example:
 
-- If your miner’s IP is 192.168.2.26, you would run:
-
 ```bash
-- python bitaxe_temp_monitor.py 192.168.2.26 -p 30
+- python main.py
 ```
 
 ## Understanding the Program
