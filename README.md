@@ -41,7 +41,7 @@ The script aims to maximize the device's hash rate while preventing overheating,
 Run the script by providing the IP address of your Bitaxe. You can also specify initial voltage, frequency, target temperature, and monitoring interval.
 
 ```bash
-python3 bitaxe_temp_monitor.py <bitaxe_ip> [options]
+python3 bitaxe-temp-auto-tuner.py <bitaxe_ip> [options]
 ```
 
 ### Command-Line Options
