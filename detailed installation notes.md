@@ -1,4 +1,4 @@
-# Bitaxe Temperature Monitor and Auto-Tuner
+# Bitaxe Temp Monitor / Auto Tuner - Detailed Installation Notes
 
 This project contains a Python script that continuously monitors a Bitaxe Gamma 601 Bitcoin solo miner's operating temperature and automatically adjusts its operating frequency (and voltage if necessary) to achieve optimal hash rate without overheating the device.
 
@@ -29,7 +29,7 @@ The Bitaxe Temperature Monitor and Auto-Tuner script helps optimize your mining 
 - **Step 3**: Install Required Dependencies
 
 - This program requires the requests module to communicate with the Bitaxe miner. 
-		- Install it by running:
+- Install it by running:
 	
    ```bash
 	pip install requests
