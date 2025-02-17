@@ -21,8 +21,8 @@ def parse_arguments():
                         help='Initial core voltage in mV (default: 1250)')
     parser.add_argument('-f', '--frequency', type=int, default=875,
                         help='Initial frequency in MHz (default: 875)')
-    parser.add_argument('-t', '--target_temp', type=int, default=65,
-                        help='Target CPU temperature in °C (default: 65)')
+    parser.add_argument('-t', '--target_temp', type=int, default=60,
+                        help='Target CPU temperature in °C (default: 60)')
     parser.add_argument('-i', '--interval', type=int, default=5,
                         help='Monitoring sample interval in seconds (default: 5)')
     parser.add_argument('-p', '--power_limit', type=int, default=30,
