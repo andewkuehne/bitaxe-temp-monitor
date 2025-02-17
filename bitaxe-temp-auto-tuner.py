@@ -25,8 +25,8 @@ def parse_arguments():
                         help='Target CPU temperature in °C (default: 65)')
     parser.add_argument('-i', '--interval', type=int, default=10,
                         help='Monitoring sample interval in seconds (default: 10)')
-    parser.add_argument('-p', '--power_limit', type=int, default=30,
-                        help='Power supply wattage limit (default: 30W)')
+    parser.add_argument('-p', '--power_limit', type=int, default=28,
+                        help='Power supply wattage limit (default: 28W)')
     return parser.parse_args()
 
 
