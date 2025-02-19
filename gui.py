@@ -114,9 +114,9 @@ class BitaxeAutotuningApp:
         self.add_button = tk.Button(button_container, text="Add Miner", command=self.add_miner, **button_style)
         self.delete_button = tk.Button(button_container, text="Remove Miner", command=self.delete_miner, **button_style)
         self.start_button = tk.Button(button_container, text="Start Autotuner", command=self.start_autotuning,
-                                      **button_style)
+                                      font=("Arial", 10, "bold"), bg="gold")
         self.stop_button = tk.Button(button_container, text="Stop Autotuner", command=self.stop_autotuning,
-                                     **button_style)
+                                     font=("Arial", 10, "bold"), bg="gold")
 
         # Arrange buttons in a centered row
         self.global_settings_button.grid(row=0, column=0, padx=5, pady=5)
