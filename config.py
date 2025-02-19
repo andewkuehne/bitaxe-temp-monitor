@@ -8,7 +8,7 @@ BITAXE_MODELS = {
     "Gamma": {"min_freq": 525, "max_freq": 1275, "min_volt": 1000, "max_volt": 1300, "max_temp": 65, "max_watts": 25, "target_hashrate": 1400},
     "Supra": {"min_freq": 700, "max_freq": 1100, "min_volt": 1050, "max_volt": 1350, "max_temp": 65, "max_watts": 25, "target_hashrate": 700},
     "Ultra": {"min_freq": 750, "max_freq": 1200, "min_volt": 1100, "max_volt": 1400, "max_temp": 65, "max_watts": 25, "target_hashrate": 400},
-    "Hex": {"min_freq": 800, "max_freq": 1250, "min_volt": 1150, "max_volt": 1450, "max_temp": 65, "max_watts": 25, "target_hashrate": 200}
+    "Hex": {"min_freq": 550, "max_freq": 1250, "min_volt": 1150, "max_volt": 1450, "max_temp": 65, "max_watts": 120, "target_hashrate": 3600}
 }
 
 def load_config():
