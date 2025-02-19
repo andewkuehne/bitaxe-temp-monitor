@@ -390,13 +390,35 @@ class BitaxeAutotuningApp:
         tk.Button(add_window, text="Add", font=("Arial", 10), width=10, command=add_entry, bg="white").pack(pady=10)
 
     def delete_miner(self):
-        """Deletes selected miner(s) from the table and config.json."""
+        """Deletes selected miner(s) from the table and removes them from config.json."""
         selected_items = self.tree.selection()
+
+        if not selected_items:
+            messagebox.showwarning("No Selection", "Please select a miner to delete.")
+            return
+
+        confirmation = messagebox.askyesno("Delete Miner", "Are you sure you want to remove the selected miner(s)?")
+        if not confirmation:
+            return
+
+        config = load_config()  # Load current config
+        miners = config.get("miners", [])  # Get the list of miners
+
         for item in selected_items:
             values = self.tree.item(item, "values")
-            ip = values[2]  # Extract IP address
+            ip = values[1]  # Extract miner's IP address
+
+            # Remove miner from GUI
             self.tree.delete(item)
-            remove_miner(ip)  # Remove from config.json
+
+            # Remove miner from config.json
+            miners = [miner for miner in miners if miner["ip"] != ip]
+
+        # Update config.json to remove deleted miners
+        config["miners"] = miners
+        save_config(config)  # Save changes to config.json
+
+        self.log_message("Miner(s) removed successfully.", "success")
 
     def start_autotuning(self):
         """Starts autotuning miners."""
