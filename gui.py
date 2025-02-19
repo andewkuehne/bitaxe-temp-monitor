@@ -366,7 +366,7 @@ class BitaxeAutotuningApp:
         ip_entry.grid(row=1, column=1, padx=10, pady=2)
 
         def add_entry():
-            """Validates and adds the new miner to the list."""
+            """Validates and adds the new miner to the list, ensuring no duplicate IPs."""
             bitaxe_type = type_var.get()
             ip = ip_entry.get().strip()
 
@@ -374,16 +374,20 @@ class BitaxeAutotuningApp:
                 messagebox.showerror("Error", "IP Address is required.")
                 return
 
-            defaults = get_miner_defaults(bitaxe_type)
+            # Check if the IP already exists in the Treeview list
+            for item in self.tree.get_children():
+                values = self.tree.item(item, "values")
+                if values[1] == ip:  # IP is in the second column
+                    messagebox.showwarning("Duplicate Miner", f"A miner with IP {ip} is already added.")
+                    return
 
+            # Insert the new miner with empty values for frequency, voltage, temp, etc.
             self.tree.insert("", "end", values=(
-                bitaxe_type, ip,
-                defaults["min_freq"], defaults["max_freq"],
-                defaults["min_volt"], defaults["max_volt"],
-                defaults["max_temp"], defaults["max_watts"], "1600"
+                bitaxe_type, ip, "", "", "", "", "", "", ""
             ))
 
             add_miner(bitaxe_type, ip)  # Save to config.json
+            messagebox.showinfo("Success", f"Miner with IP {ip} added successfully.")
             add_window.destroy()
 
         # Miner Button (Styled)
