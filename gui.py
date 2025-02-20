@@ -687,15 +687,20 @@ class BitaxeAutotuningApp:
 
     def log_message(self, message, level="info"):
         """Logs messages to the UI, ensuring updates run on the main thread."""
-
+    
         def _update_log():
+            if not self.root.winfo_exists():  # Check if window is still open
+                return
+    
             colors = {"success": "green", "warning": "orange", "error": "red", "info": "black"}
             self.log_output.insert(tk.END, message + "\n", level)
             self.log_output.tag_config(level, foreground=colors[level])
             self.log_output.yview(tk.END)
-
+    
         # Ensure Tkinter UI updates run on the main thread
-        self.root.after(0, _update_log)
+        if self.root.winfo_exists():  # Prevent calls after window is closed
+            self.root.after(0, _update_log)
+
 
     def run(self):
         """Runs the Tkinter event loop."""
