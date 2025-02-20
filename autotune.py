@@ -76,14 +76,14 @@ def monitor_and_adjust(bitaxe_ip, bitaxe_type, interval, log_callback,
         hash_rate = info.get("hashRate", 0)
         power_consumption = info.get("power", 0)
 
-        log_callback(f"{bitaxe_ip} -> Temp: {temp}°C | Hashrate: {int(hash_rate)} GH/s | Power: {power_consumption}W",
+        log_callback(f"{bitaxe_ip} -> Temp: {temp}°C | Hashrate: {int(hash_rate)} GH/s | Power: {round(power_consumption,2)}W | Voltage: {current_voltage}V | Frequency:{current_frequency}MHz",
                      "success")
 
         new_voltage, new_frequency = current_voltage, current_frequency
 
         # **STEP-DOWN LOGIC**
         if temp is None or power_consumption > max_watts or temp > max_temp:
-            log_callback(f"{bitaxe_ip} -> Overheating or Power Limit Exceeded! Lowering settings.", "error")
+            log_callback(f"{bitaxe_ip} -> Overheating by ({temp}/{max_temp}°C) or Power Limit of {max_watts}W Exceeded! Using {round(power_consumption,2)}W...Lowering settings.", "error")
 
             if current_voltage - 10 >= min_volt:
                 new_voltage -= 10

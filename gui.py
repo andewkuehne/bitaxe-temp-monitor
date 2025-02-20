@@ -1,7 +1,7 @@
 import tkinter as tk
 from tkinter import scrolledtext, ttk, messagebox
 import threading
-import time
+from datetime import datetime
 from config import get_miner_defaults, add_miner, remove_miner, get_miners, update_miner, load_config, save_config, detect_miners
 from autotune import monitor_and_adjust, stop_autotuning, get_system_info
 
@@ -687,11 +687,13 @@ class BitaxeAutotuningApp:
 
     def log_message(self, message, level="info"):
         """Logs messages to the UI, ensuring updates run on the main thread."""
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        message = f"[{timestamp}] {message}"
     
         def _update_log():
             if not self.root.winfo_exists():  # Check if window is still open
                 return
-    
+
             colors = {"success": "green", "warning": "orange", "error": "red", "info": "black"}
             self.log_output.insert(tk.END, message + "\n", level)
             self.log_output.tag_config(level, foreground=colors[level])
