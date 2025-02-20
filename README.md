@@ -1,65 +1,91 @@
 # Bitaxe Temperature Monitor and Auto-Tuner
 
-This project contains a Python script that continuously monitors a Bitaxe Gamma 601 Bitcoin solo miner's operating temperature and automatically adjusts its operating frequency (and voltage if necessary) to achieve optimal hash rate without overheating the device.
+This project contains a Python-based monitoring and auto-tuning application for the Bitaxe Gamma 601 Bitcoin solo miner. This tool dynamically adjusts operating frequency and voltage to achieve optimal hash rate while preventing overheating.
 
 ## Overview
 
-The Bitaxe Gamma Autotuner and Auto-Tuner script continuously polls the Bitaxe's `/api/system/info` endpoint to read current temperature, hash rate, and voltage. Based on a configurable target temperature (default is 60°C) and a defined temperature margin, the script automatically adjusts:
+The **Bitaxe Temp Monitor & Auto-Tuner** continuously polls the Bitaxe's `/api/system/info` endpoint to monitor current temperature, hash rate, and voltage. Based on configurable parameters (target temperature, interval, voltage step, etc.), the script automatically adjusts:
 
 - **Frequency**: Decreases frequency if the temperature exceeds the target or increases if the temperature is well below the target.
 - **Voltage**: If frequency adjustments alone are insufficient or if the settings are at their limits, voltage is also adjusted within safe operating ranges.
 
-The script aims to maximize the device's hash rate while preventing overheating, using safe settings based on your previously benchmarked results.
+The app aims to maximize the miner's hash rate while maintaining stable and safe operation.
 
 ## Features
 
-- **Automatic autotuning**: Continuously checks the Bitaxe's temperature and performance.
-- **Dynamic Adjustment**: Adjusts frequency and voltage in real time based on the current temperature.
-- **Graceful Shutdown**: Listens for interrupt signals (Ctrl+C) and exits gracefully.
-- **Customizable Parameters**: Easily modify target temperature, sample interval, step sizes, and safe operating limits.
+- **Automatic Auto-Tuning**: Continuously monitors the Bitaxe's performance and temperature.
+- **Dynamic Adjustment**: Automatically adjusts frequency and voltage in real-time based on the current temperature and hash rate.
+- **Graceful Shutdown**: Listens for interrupt signals (Ctrl+C) and exits safely.
+- **Customizable Parameters**: Easily modify settings such as target temperature, sample interval, and safe operating limits.
+- **Cross-Platform Support**: Works seamlessly on both **Windows** and **Linux**.
 
 ## Requirements
 
-- Python 3.x
-- `requests` module (install using `pip install requests`)
-
+- **Python 3.x** (tested with Python 3.9+)
+- Required Python modules:
+  - `requests`
+  - `tkinter` (pre-installed on Windows, may require manual installation on Linux)
+  
 ## Installation
 
-1. **Clone the repository:**
+### For Windows
+
+1. Open Command Prompt as Administrator.
+2. Clone the repository:
+
    ```bash
    git clone https://github.com/hurllz/bitaxe-temp-monitor.git
    cd bitaxe-temp-monitor
    ```
+   
+3. Install dependencies:
 
-2. **Install dependencies:**
    ```bash
-   pip install requests
-   pip install tkinter
+	pip install requests
+   ```
+   
+4. Run the application:
+
+   ```bash
+	pyhon main.py
+   ```
+
+### For Linux
+
+1. Open terminal window
+2. Clone the repository:
+
+   ```bash
+	git clone https://github.com/hurllz/bitaxe-temp-monitor.git
+	cd bitaxe-temp-monitor
+   ```
+
+2. Install dependencies:
+
+   ```bash
+	sudo apt-get install python3-tk
+	pip install requests
+   ```
+   
+4. Run the application:
+
+   ```bash
+	python3 main.py
    ```
 
 ## Usage
 
-Run the script by providing the IP address of your Bitaxe. You can also specify initial voltage, frequency, target temperature, and autotuning interval.
-
-```bash
-python main.py
-```
-
-#### Example
-
-```bash
-python main.py
-```
+To start the app, provide the IP address of your Bitaxe miner. You can specify initial voltage, frequency, target temperature, and the interval for autotuning.
 
 ## How It Works
 
 1. **Initialization**: The script applies the initial voltage and frequency settings to the Bitaxe.
 2. **autotuning Loop**:  
-   - It retrieves system data from the Bitaxe.
-   - If the temperature exceeds the target, the script reduces the frequency (or voltage if necessary) to cool the system.
-   - If the temperature is well below the target minus a margin, it increases the frequency (or voltage) to maximize performance.
-3. **Adjustment**: Settings are applied via the Bitaxe API, allowing time for system stabilization after each change.
-4. **Graceful Exit**: The script listens for interrupt signals (Ctrl+C) and safely exits while logging the final state.
+   - Continuously retrieves system data from the Bitaxe API.
+   - Decreases frequency or voltage if the temperature exceeds the target.
+   - ncreases frequency or voltage if the temperature is significantly below the target.
+3. Dynamic Adjustment: Applies settings in real-time for optimized performance.
+4. Graceful Exit: Listens for interrupt signals and logs the final state when the app is stopped.
 
 ## Disclaimer
 
