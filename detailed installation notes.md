@@ -33,6 +33,7 @@ The Bitaxe Temperature Monitor and Auto-Tuner script helps optimize your mining 
 	
    ```bash
 	pip install requests
+   	ping install tkinter
    ```
    
 -**Step 4**: Running the Program
