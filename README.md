@@ -27,7 +27,7 @@ The script aims to maximize the device's hash rate while preventing overheating,
 
 1. **Clone the repository:**
    ```bash
-   git clone https://github.com/yourusername/bitaxe-temp-monitor.git
+   git clone https://github.com/hurllz/bitaxe-temp-monitor.git
    cd bitaxe-temp-monitor
    ```
 
