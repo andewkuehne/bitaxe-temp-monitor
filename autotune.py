@@ -58,9 +58,17 @@ def monitor_and_adjust(bitaxe_ip, bitaxe_type, interval, log_callback,
     current_voltage = min_volt
     current_frequency = min_freq
 
+    voltage_step = VOLTAGE_STEP
+    frequency_step = FREQUENCY_STEP
+
+    frequency_range = max_freq - min_freq
+    voltage_range = max_volt - min_volt
+
     # Apply initial settings
     applied_settings = set_system_settings(bitaxe_ip, current_voltage, current_frequency)
     log_callback(applied_settings, "info")
+
+    
 
     while running:
         info = get_system_info(bitaxe_ip)
@@ -71,55 +79,91 @@ def monitor_and_adjust(bitaxe_ip, bitaxe_type, interval, log_callback,
             log_callback(info, "error")
             time.sleep(interval)
             continue
+        
+        small_core_count = info.get("smallCoreCount")
+        asic_count = info.get("asicCount")
+        expected_hashrate = int(current_frequency * ((small_core_count * asic_count) / 1000)) # Calculate expected hashrate
 
         temp = info.get("temp", 0)
         hash_rate = info.get("hashRate", 0)
         power_consumption = info.get("power", 0)
 
-        log_callback(f"{bitaxe_ip} -> Temp: {temp}°C | Hashrate: {int(hash_rate)} GH/s | Power: {round(power_consumption,2)}W | Voltage: {current_voltage}V | Frequency:{current_frequency}MHz",
+        log_callback(f"{bitaxe_ip} -> Temp: {temp}°C | Hashrate: {int(hash_rate)}/{expected_hashrate} GH/s | Power: {round(power_consumption,2)}W | Voltage: {current_voltage}V | Frequency: {current_frequency} MHz",
                      "success")
 
         new_voltage, new_frequency = current_voltage, current_frequency
+        volt_range_percent = (current_voltage - min_volt)/voltage_range # percentage from min to max voltage of where current voltage is
+        freq_range_percent = (current_frequency - min_freq)/frequency_range # percentage from min to max voltage of where current voltage is
 
         # **STEP-DOWN LOGIC**
         if temp is None or power_consumption > max_watts or temp > max_temp:
             log_callback(f"{bitaxe_ip} -> Overheating by ({temp}/{max_temp}°C) or Power Limit of {max_watts}W Exceeded! Using {round(power_consumption,2)}W...Lowering settings.", "error")
 
-            if current_voltage - 10 >= min_volt:
-                new_voltage -= 10
+            if current_voltage - voltage_step >= min_volt:
+                new_voltage -= voltage_step
                 log_callback(f"{bitaxe_ip} -> Lowering voltage to {new_voltage}mV.", "warning")
-            elif current_frequency - 5 >= min_freq:
-                new_frequency -= 5
+            elif current_frequency - frequency_step >= min_freq:
+                new_frequency -= frequency_step
                 log_callback(f"{bitaxe_ip} -> Lowering frequency to {new_frequency}MHz.", "warning")
             else:
                 log_callback(f"{bitaxe_ip} -> Minimum settings reached! Holding state.", "error")
 
-        # **STEP-UP LOGIC**
-        elif temp < (max_temp - 3) and power_consumption < (max_watts * 0.9):
-            log_callback(f"{bitaxe_ip} -> Temp {temp}°C is low. Trying to optimize.", "info")
 
-            if current_voltage + 10 <= max_volt:
-                new_voltage += 10
-                log_callback(f"{bitaxe_ip} -> Increasing voltage to {new_voltage}mV for stability.", "info")
-            elif current_frequency + 5 <= max_freq:
-                new_frequency += 5
-                log_callback(f"{bitaxe_ip} -> Increasing frequency to {new_frequency}MHz.", "info")
+        # NEW STEP-UP LOGIC BASED ON EXPECTED VS ACTUAL HASHRATE AND RANGE OF VOLTAGE AND FREQUENCY
+        elif temp < max_temp and power_consumption < max_watts and hash_rate < expected_hashrate:
+            log_callback(f"{bitaxe_ip} -> Temp {temp}°C is low. Trying to optimize.", "info")
+            # checking in interval steps of 25%
+            if ((freq_range_percent >= 0.25 and volt_range_percent <= 0.25) or
+                (freq_range_percent >= 0.5 and volt_range_percent <= 0.5) or
+                (freq_range_percent >= 0.75 and volt_range_percent <= 0.75)):
+                
+                new_voltage += voltage_step
+                volt_range_percent = (new_voltage - min_volt)/voltage_range
+
+                log_callback(f"{bitaxe_ip} -> Increasing voltage to {new_voltage}mV / {int(volt_range_percent*100)}% for stability.", "info")
+
+            elif ((freq_range_percent < 0.25 and volt_range_percent <= 0.25) or
+                (freq_range_percent < 0.5 and volt_range_percent <= 0.5) or
+                (freq_range_percent < 0.75 and volt_range_percent <= 0.75)):
+
+                new_frequency += frequency_step
+                freq_range_percent = (new_frequency - min_freq)/frequency_range
+
+                log_callback(f"{bitaxe_ip} -> Increasing frequency to {new_frequency}MHz / {int(freq_range_percent*100)}%", "info")
+
             else:
                 log_callback(f"{bitaxe_ip} -> Already at maximum safe settings.", "info")
 
-        # **HASHRATE RECOVERY**
-        elif hash_rate < target_hashrate:
-            log_callback(f"{bitaxe_ip} -> Hashrate below {target_hashrate} GH/s! Adjusting settings.", "warning")
+        # NEW HASHRATE FINE-TUNING BASED ON EXPECTED VS ACTUAL HASHRATE
+        elif hash_rate > expected_hashrate and hash_rate < target_hashrate:
+            log_callback(f"{bitaxe_ip} -> Hashrate below target hashrate {target_hashrate} GH/s! Adjusting settings.", "warning")
 
-            if current_voltage + 10 <= max_volt:
-                new_voltage += 10
-                log_callback(f"{bitaxe_ip} -> Increasing voltage to {new_voltage}mV for hashrate recovery.", "info")
-            elif current_frequency + 5 <= max_freq:
-                new_frequency += 5
-                log_callback(f"{bitaxe_ip} -> Increasing frequency to {new_frequency}MHz to recover hashrate.", "info")
+            if current_frequency + frequency_step <= max_freq:
+                new_frequency += frequency_step
+                freq_range_percent = (new_frequency - min_freq)/frequency_range
+
+                log_callback(f"{bitaxe_ip} -> Increasing frequency to {new_frequency}MHz / {int(freq_range_percent*100)}% to fine-tune hashrate.", "info")
+
+            elif current_voltage + voltage_step <= max_volt:
+                new_voltage += voltage_step
+                volt_range_percent = (new_voltage - min_volt)/voltage_range
+
+                log_callback(f"{bitaxe_ip} -> Increasing voltage to {new_voltage}mV / {int(volt_range_percent*100)}% for hashrate fine-tuning.", "info")
+
             else:
-                log_callback(f"{bitaxe_ip} -> Hashrate is low, but already at max safe settings.", "warning")
+                log_callback(f"{bitaxe_ip} -> Hashrate is under target of {target_hashrate} GH/s, but already at max safe settings.", "warning")
 
+        # HEALTHY HASHING
+        elif hash_rate > expected_hashrate and hash_rate > target_hashrate:
+            log_callback(f"{bitaxe_ip} -> Hashrate above target {target_hashrate} GH/s and healthy! No adjustments needed.<Increase hashrate target for better results.>", "success")
+
+        # DECREASE VOLTAGE IF NO PROGRESS IS BEING MADE
+        else:
+            new_voltage -= (voltage_step * 5) # try to reduce voltage if progress isn't being made
+            volt_range_percent = (new_voltage - min_volt)/voltage_range
+
+            log_callback(f"{bitaxe_ip} -> Inefficinet hashing, decreasing voltage to {new_voltage}v / {int(volt_range_percent*100)}%.", "warning")
+        
         # Apply changes dynamically without restarting
         if new_voltage != current_voltage or new_frequency != current_frequency:
             applied_settings = set_system_settings(bitaxe_ip, new_voltage, new_frequency)
