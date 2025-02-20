@@ -34,6 +34,7 @@ The script aims to maximize the device's hash rate while preventing overheating,
 2. **Install dependencies:**
    ```bash
    pip install requests
+   pip install tkinter
    ```
 
 ## Usage
