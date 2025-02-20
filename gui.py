@@ -317,13 +317,12 @@ class BitaxeAutotuningApp:
 
         autotuner_window = tk.Toplevel(self.root)
         autotuner_window.title("AutoTuner Settings")
-        autotuner_window.geometry("1000x500")
+        autotuner_window.geometry("1150x500")
         autotuner_window.config(bg="white")
 
         tk.Label(autotuner_window, text="Modify AutoTuner Settings", font=("Arial", 12, "bold"), bg="white").pack(
             pady=10)
 
-        # Create a frame for the scrollable content
         container = tk.Frame(autotuner_window, bg="white")
         container.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
 
@@ -331,12 +330,8 @@ class BitaxeAutotuningApp:
         scrollbar = tk.Scrollbar(container, orient="vertical", command=canvas.yview)
         scrollable_frame = tk.Frame(canvas, bg="white")
 
-        # Bind the scrollbar
         scrollable_frame.bind(
-            "<Configure>",
-            lambda e: canvas.configure(
-                scrollregion=canvas.bbox("all")
-            )
+            "<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
         )
 
         canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
@@ -345,46 +340,107 @@ class BitaxeAutotuningApp:
         canvas.pack(side="left", fill="both", expand=True)
         scrollbar.pack(side="right", fill="y")
 
-        # Define column headers
-        headers = ["Miner", "Min Freq", "Max Freq", "Min Volt", "Max Volt", "Max Temp", "Max Watts", "Target Hashrate"]
+        headers = ["Enable", "Miner", "Min Freq", "Max Freq", "Min Volt", "Max Volt", "Max Temp", "Max Watts",
+                   "Target Hashrate", "Actions"]
 
+        # Create table headers
         for col_idx, header in enumerate(headers):
-            tk.Label(scrollable_frame, text=header, font=("Arial", 10, "bold"), bg="white").grid(row=0, column=col_idx,
-                                                                                                 padx=5, pady=5)
+            tk.Label(scrollable_frame, text=header, font=("Arial", 10, "bold"), bg="white").grid(
+                row=0, column=col_idx, padx=5, pady=5
+            )
 
         settings_entries = {}
+        selected_miners = {}  # Track enabled/disabled miners
+        clipboard = {}  # Stores copied row data
+
+        def copy_row(row_idx):
+            """Copies values from the selected row into clipboard."""
+            nonlocal clipboard
+            clipboard = {field: settings_entries[row_idx][field].get() for field in settings_entries[row_idx]}
+
+        def paste_row(row_idx):
+            """Pastes values from the clipboard into the selected row."""
+            if not clipboard:
+                messagebox.showwarning("No Data", "No row has been copied yet.")
+                return
+
+            for field, entry in settings_entries[row_idx].items():
+                if field in clipboard:
+                    entry.delete(0, tk.END)
+                    entry.insert(0, clipboard[field])
+
+            validate_miner_settings(row_idx)  # Recheck if miner can be enabled after pasting
+
+        def validate_miner_settings(row_idx):
+            """Checks if all required values are filled and enables/disables the checkbox accordingly."""
+            has_empty_values = any(entry.get() == "" for entry in settings_entries[row_idx].values())
+
+            if has_empty_values:
+                selected_miners[row_idx].set(False)
+                enable_checkboxes[row_idx].config(state=tk.DISABLED)
+            else:
+                enable_checkboxes[row_idx].config(state=tk.NORMAL)
+
+        enable_checkboxes = {}  # Store references to checkboxes
 
         # Populate rows with miner data
         for row_idx, miner in enumerate(miners, start=1):
-            # Miner Name Column
+            # Checkbox to enable/disable miner
+            var = tk.BooleanVar(value=miner.get("enabled", False))
+            chk = tk.Checkbutton(scrollable_frame, variable=var, bg="white")
+            chk.grid(row=row_idx, column=0, padx=5, pady=5)
+            selected_miners[row_idx] = var
+            enable_checkboxes[row_idx] = chk
+
+            # Miner Nickname & IP
             tk.Label(scrollable_frame, text=f"{miner['nickname']} ({miner['ip']})", bg="white",
-                     font=("Arial", 10)).grid(row=row_idx, column=0, padx=5, pady=5, sticky="w")
+                     font=("Arial", 10)).grid(row=row_idx, column=1, padx=5, pady=5, sticky="w")
 
             fields = ["min_freq", "max_freq", "min_volt", "max_volt", "max_temp", "max_watts", "target_hashrate"]
             miner_settings = {}
 
-            for col_idx, field in enumerate(fields, start=1):
+            for col_idx, field in enumerate(fields, start=2):
                 entry = tk.Entry(scrollable_frame, bg="white", width=10)
-                entry.insert(0, miner.get(field, ""))  # Load existing values
+                entry.insert(0, miner.get(field, ""))
                 entry.grid(row=row_idx, column=col_idx, padx=5, pady=5)
                 miner_settings[field] = entry
 
-            settings_entries[miner["ip"]] = miner_settings
+                # Bind validation function to detect changes
+                entry.bind("<KeyRelease>", lambda event, idx=row_idx: validate_miner_settings(idx))
+
+            settings_entries[row_idx] = miner_settings
+
+            # **Add Copy and Paste Buttons**
+            copy_button = tk.Button(scrollable_frame, text="Copy", font=("Arial", 8), width=10,
+                                    command=lambda idx=row_idx: copy_row(idx))
+            paste_button = tk.Button(scrollable_frame, text="Paste", font=("Arial", 8), width=10,
+                                     command=lambda idx=row_idx: paste_row(idx))
+
+            copy_button.grid(row=row_idx, column=len(fields) + 2, padx=2, pady=5)
+            paste_button.grid(row=row_idx, column=len(fields) + 3, padx=2, pady=5)
+
+            # Validate miner settings initially
+            validate_miner_settings(row_idx)
 
         def save_autotuner_settings():
             """Save the modified AutoTuner settings to config.json."""
-            for miner in config["miners"]:
-                if miner["ip"] in settings_entries:
-                    for field, entry in settings_entries[miner["ip"]].items():
+            for idx, miner in enumerate(config["miners"], start=1):
+                if idx in settings_entries:
+                    for field, entry in settings_entries[idx].items():
                         miner[field] = int(entry.get()) if entry.get().isdigit() else ""
+
+                # Store the selection status
+                miner["enabled"] = selected_miners[idx].get()
 
             save_config(config)
             self.log_message("Updated AutoTuner settings for all miners.", "success")
             messagebox.showinfo("Settings Saved", "AutoTuner settings have been successfully saved!")
             autotuner_window.destroy()
 
-        tk.Button(autotuner_window, text="Save", font=("Arial", 10), bg="gold", command=save_autotuner_settings).pack(
-            pady=10)
+        tk.Button(autotuner_window, text="Save", font=("Arial", 10), width=10, bg="gold",
+                  command=save_autotuner_settings).pack(
+            pady=10
+        )
 
     def delete_miner(self):
         """Deletes the selected miner from the UI and config.json."""
@@ -528,6 +584,9 @@ class BitaxeAutotuningApp:
 
         # Validate that each miner has all required AutoTuner settings
         for miner in config.get("miners", []):
+            if not miner.get("enabled", False):  # Skip miners that are disabled
+                continue
+
             for field in required_fields:
                 if field not in miner or miner[field] == "" or miner[field] is None:
                     missing_settings.append((miner["ip"], field))
@@ -543,36 +602,38 @@ class BitaxeAutotuningApp:
             self.running = False
             return
 
-        self.log_message("Starting autotuning for miners...", "success")
+        self.log_message("Starting autotuning for selected miners...", "success")
 
-        for item in self.tree.get_children():
-            values = self.tree.item(item, "values")
-            ip, bitaxe_type = values[2], values[1]
+        active_miners = [m for m in config.get("miners", []) if m.get("enabled", False)]
 
-            # Fetch latest AutoTuner settings per miner
-            miner_settings = next((m for m in config["miners"] if m["ip"] == ip), None)
+        if not active_miners:
+            self.log_message("No miners are enabled for AutoTuning. Please enable at least one miner.", "error")
+            messagebox.showwarning("No Miners Enabled",
+                                   "No miners are enabled for AutoTuning. Please enable at least one miner in settings.")
+            self.running = False
+            return
 
-            if miner_settings:
-                min_freq = miner_settings.get("min_freq", 0)
-                max_freq = miner_settings.get("max_freq", 0)
-                min_volt = miner_settings.get("min_volt", 0)
-                max_volt = miner_settings.get("max_volt", 0)
-                max_temp = miner_settings.get("max_temp", 0)
-                max_watts = miner_settings.get("max_watts", 0)
-                target_hashrate = miner_settings.get("target_hashrate", 0)
-                interval = config.get("monitor_interval", 5)  # Global setting
+        for miner in active_miners:
+            ip, bitaxe_type = miner["ip"], miner["type"]
 
-                # Pass settings dynamically to `monitor_and_adjust`
-                thread = threading.Thread(
-                    target=monitor_and_adjust,
-                    args=(ip, bitaxe_type, interval, self.log_message,
-                          min_freq, max_freq, min_volt, max_volt,
-                          max_temp, max_watts, target_hashrate)
-                )
-                thread.start()
-                self.threads.append(thread)
-            else:
-                self.log_message(f"Warning: No AutoTuner settings found for miner {ip}", "warning")
+            min_freq = miner.get("min_freq", 0)
+            max_freq = miner.get("max_freq", 0)
+            min_volt = miner.get("min_volt", 0)
+            max_volt = miner.get("max_volt", 0)
+            max_temp = miner.get("max_temp", 0)
+            max_watts = miner.get("max_watts", 0)
+            target_hashrate = miner.get("target_hashrate", 0)
+            interval = config.get("monitor_interval", 5)  # Global setting
+
+            # Pass settings dynamically to `monitor_and_adjust`
+            thread = threading.Thread(
+                target=monitor_and_adjust,
+                args=(ip, bitaxe_type, interval, self.log_message,
+                      min_freq, max_freq, min_volt, max_volt,
+                      max_temp, max_watts, target_hashrate)
+            )
+            thread.start()
+            self.threads.append(thread)
 
         # Ensure UI updates based on monitor interval
         self.update_miner_display(interval)
