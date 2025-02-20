@@ -34,7 +34,7 @@ The app aims to maximize the miner's hash rate while maintaining stable and safe
 2. Clone the repository:
 
    ```bash
-   git clone https://github.com/hurllz/bitaxe-temp-monitor.git
+   git clone https://github.com/hurllz/bitaxe-temp-monitor](https://github.com/Hurllz/bitaxe-temp-monitor/tree/refactored_gui_and_mulit_bitaxe_provisioning.git
    cd bitaxe-temp-monitor
    ```
    
@@ -56,7 +56,9 @@ The app aims to maximize the miner's hash rate while maintaining stable and safe
 2. Clone the repository:
 
    ```bash
-	git clone https://github.com/hurllz/bitaxe-temp-monitor.git
+
+	git clone https://github.com/hurllz/bitaxe-temp-monitor](https://github.com/Hurllz/bitaxe-temp-monitor/tree/refactored_gui_and_mulit_bitaxe_provisioning.git
+
 	cd bitaxe-temp-monitor
    ```
 
