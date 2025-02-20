@@ -5,19 +5,5 @@
     "default_target_temp": 50,
     "temp_tolerance": 2,
     "refresh_interval": 5,
-    "miners": [
-        {
-            "nickname": "Miner-192.168.0.101",
-            "ip": "192.168.0.101",
-            "type": "Unknown",
-            "min_freq": 750,
-            "max_freq": 1050,
-            "min_volt": 1200,
-            "max_volt": 1300,
-            "max_temp": 50,
-            "max_watts": 25,
-            "target_hashrate": 1400,
-            "enabled": true
-        }
-    ]
+    "miners": []
 }
