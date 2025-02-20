@@ -1,7 +1,7 @@
 import requests
 import time
 import threading
-from config import load_config, get_miners, get_miner_defaults
+from config import load_config, get_miners, get_miner_defaults, detect_miners
 
 # Load global configuration
 config = load_config()
@@ -41,21 +41,19 @@ def restart_bitaxe(bitaxe_ip):
     except requests.exceptions.RequestException as e:
         return f"{bitaxe_ip} -> Error restarting system: {e}"
 
-def monitor_and_adjust(bitaxe_ip, bitaxe_type, interval, log_callback):
-    """Monitor and auto-adjust miner settings dynamically."""
+def monitor_and_adjust(bitaxe_ip, bitaxe_type, interval, log_callback,
+                        min_freq, max_freq, min_volt, max_volt,
+                        max_temp, max_watts, target_hashrate):
+    """Monitor and auto-adjust miner settings dynamically based on user-defined AutoTuner settings."""
     global running
     running = True
 
-    # Get miner-specific defaults
-    miner_defaults = get_miner_defaults(bitaxe_type)
-
-    min_freq = miner_defaults["min_freq"]
-    max_freq = miner_defaults["max_freq"]
-    min_volt = miner_defaults["min_volt"]
-    max_volt = miner_defaults["max_volt"]
-    max_temp = miner_defaults["max_temp"]
-    max_watts = miner_defaults["max_watts"]
-    target_hashrate = miner_defaults["target_hashrate"]
+    # Ensure all required settings are present
+    required_fields = [min_freq, max_freq, min_volt, max_volt, max_temp, max_watts, target_hashrate]
+    if any(value is None or value == "" for value in required_fields):
+        log_callback(f"{bitaxe_ip} -> Missing AutoTuner settings. Skipping tuning.", "error")
+        running = False
+        return
 
     current_voltage = min_volt
     current_frequency = min_freq
@@ -87,11 +85,11 @@ def monitor_and_adjust(bitaxe_ip, bitaxe_type, interval, log_callback):
         if temp is None or power_consumption > max_watts or temp > max_temp:
             log_callback(f"{bitaxe_ip} -> Overheating or Power Limit Exceeded! Lowering settings.", "error")
 
-            if current_voltage - VOLTAGE_STEP >= min_volt:
-                new_voltage -= VOLTAGE_STEP
+            if current_voltage - 10 >= min_volt:
+                new_voltage -= 10
                 log_callback(f"{bitaxe_ip} -> Lowering voltage to {new_voltage}mV.", "warning")
-            elif current_frequency - FREQUENCY_STEP >= min_freq:
-                new_frequency -= FREQUENCY_STEP
+            elif current_frequency - 5 >= min_freq:
+                new_frequency -= 5
                 log_callback(f"{bitaxe_ip} -> Lowering frequency to {new_frequency}MHz.", "warning")
             else:
                 log_callback(f"{bitaxe_ip} -> Minimum settings reached! Holding state.", "error")
@@ -100,11 +98,11 @@ def monitor_and_adjust(bitaxe_ip, bitaxe_type, interval, log_callback):
         elif temp < (max_temp - 3) and power_consumption < (max_watts * 0.9):
             log_callback(f"{bitaxe_ip} -> Temp {temp}°C is low. Trying to optimize.", "info")
 
-            if current_voltage + VOLTAGE_STEP <= max_volt:
-                new_voltage += VOLTAGE_STEP
+            if current_voltage + 10 <= max_volt:
+                new_voltage += 10
                 log_callback(f"{bitaxe_ip} -> Increasing voltage to {new_voltage}mV for stability.", "info")
-            elif current_frequency + FREQUENCY_STEP <= max_freq:
-                new_frequency += FREQUENCY_STEP
+            elif current_frequency + 5 <= max_freq:
+                new_frequency += 5
                 log_callback(f"{bitaxe_ip} -> Increasing frequency to {new_frequency}MHz.", "info")
             else:
                 log_callback(f"{bitaxe_ip} -> Already at maximum safe settings.", "info")
@@ -113,11 +111,11 @@ def monitor_and_adjust(bitaxe_ip, bitaxe_type, interval, log_callback):
         elif hash_rate < target_hashrate:
             log_callback(f"{bitaxe_ip} -> Hashrate below {target_hashrate} GH/s! Adjusting settings.", "warning")
 
-            if current_voltage + VOLTAGE_STEP <= max_volt:
-                new_voltage += VOLTAGE_STEP
+            if current_voltage + 10 <= max_volt:
+                new_voltage += 10
                 log_callback(f"{bitaxe_ip} -> Increasing voltage to {new_voltage}mV for hashrate recovery.", "info")
-            elif current_frequency + FREQUENCY_STEP <= max_freq:
-                new_frequency += FREQUENCY_STEP
+            elif current_frequency + 5 <= max_freq:
+                new_frequency += 5
                 log_callback(f"{bitaxe_ip} -> Increasing frequency to {new_frequency}MHz to recover hashrate.", "info")
             else:
                 log_callback(f"{bitaxe_ip} -> Hashrate is low, but already at max safe settings.", "warning")
@@ -139,6 +137,11 @@ def stop_autotuning():
 
 def start_autotuning_all(log_callback):
     """Starts autotuning for all configured miners."""
+
+    # Detect new miners before starting
+    log_callback("Scanning network for new miners...", "info")
+    detect_miners()
+
     miners = get_miners()
     if not miners:
         log_callback("No miners configured. Please add miners in the GUI.", "error")
