@@ -109,7 +109,7 @@ def monitor_and_adjust(bitaxe_ip, bitaxe_type, interval, log_callback,
             if current_voltage - voltage_step >= min_volt:
                 new_voltage -= voltage_step
                 log_callback(f"{bitaxe_ip} -> Lowering voltage to {new_voltage}mV.", "warning")
-            elif current_frequency - frequency_step >= min_freq:
+            if current_frequency - frequency_step >= min_freq:
                 new_frequency -= frequency_step
                 log_callback(f"{bitaxe_ip} -> Lowering frequency to {new_frequency}MHz.", "warning")
             else:
@@ -163,19 +163,27 @@ def monitor_and_adjust(bitaxe_ip, bitaxe_type, interval, log_callback,
         # HEALTHY HASHING
         elif hash_rate > expected_hashrate and hash_rate > target_hashrate:
             log_callback(f"{bitaxe_ip} -> Hashrate above target {target_hashrate} GH/s and healthy! No adjustments needed.<Increase hashrate target for better results.>", "success")
+            #### ADD CODE HERE TO KEEP SETTINGS
 
-        # # DECREASE VOLTAGE IF NO PROGRESS IS BEING MADE
-        # else:
-        #     if new_voltage - (voltage_step * 2) >= min_volt:
-        #         new_voltage -= (voltage_step * 2) # try to reduce voltage if progress isn't being made
-        #     else:
-        #         new_voltage = min_volt
+        # DECREASE VOLTAGE AND FREQUENCY IF NO PROGRESS IS BEING MADE
+        else:
+            if new_voltage - voltage_step >= min_volt:
+                new_voltage -= voltage_step # try to reduce voltage if progress isn't being made
+            else:
+                new_voltage = min_volt
             
-        #     volt_range_percent = (new_voltage - min_volt)/voltage_range
+            volt_range_percent = (new_voltage - min_volt)/voltage_range
             
-        #     stepping_down = True
+            if new_frequency - frequency_step >= min_freq:
+                new_frequency -= frequency_step # try to reduce frequency if progress isn't being made
+            else:
+                new_frequency = min_freq
+            
+            freq_range_percent = (new_frequency - min_freq)/frequency_range
+            
+            stepping_down = True
 
-        #     log_callback(f"{bitaxe_ip} -> Inefficinet hashing, decreasing voltage to {new_voltage}v / {int(volt_range_percent*100)}%.", "warning")
+            log_callback(f"{bitaxe_ip} -> Inefficinet hashing, decreasing voltage to {new_voltage}V / {int(volt_range_percent*100)}%. Decreasing frequency to {new_frequency}MHz / {int(freq_range_percent*100)}%", "warning")
         
         # Apply changes dynamically without restarting
         if new_voltage != current_voltage or new_frequency != current_frequency:
