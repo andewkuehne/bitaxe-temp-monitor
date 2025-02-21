@@ -1,10 +1,10 @@
 {
     "voltage_step": 10,
     "frequency_step": 5,
-    "monitor_interval": 5,
+    "monitor_interval": 10,
     "default_target_temp": 50,
     "temp_tolerance": 2,
-    "refresh_interval": 5,
+    "refresh_interval": 10,
     "miners": [
         {
             "nickname": "ULTRA",
@@ -15,8 +15,8 @@
             "min_volt": 1200,
             "max_volt": 1350,
             "max_temp": 40,
-            "max_watts": 25,
-            "target_hashrate": 600,
+            "max_watts": 30,
+            "target_hashrate": 700,
             "enabled": true
         },
         {
@@ -27,9 +27,9 @@
             "max_freq": 1000,
             "min_volt": 1150,
             "max_volt": 1300,
-            "max_temp": 60,
-            "max_watts": 25,
-            "target_hashrate": 1600,
+            "max_temp": 55,
+            "max_watts": 45,
+            "target_hashrate": 2500,
             "enabled": true
         }
     ]

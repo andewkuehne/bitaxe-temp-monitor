@@ -623,7 +623,7 @@ class BitaxeAutotuningApp:
             max_temp = miner.get("max_temp", 0)
             max_watts = miner.get("max_watts", 0)
             target_hashrate = miner.get("target_hashrate", 0)
-            interval = config.get("monitor_interval", 5)  # Global setting
+            interval = config.get("monitor_interval", 10)  # Global setting
 
             # Pass settings dynamically to `monitor_and_adjust`
             thread = threading.Thread(
