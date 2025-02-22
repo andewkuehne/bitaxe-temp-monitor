@@ -5,32 +5,5 @@
     "default_target_temp": 50,
     "temp_tolerance": 2,
     "refresh_interval": 10,
-    "miners": [
-        {
-            "nickname": "ULTRA",
-            "type": "Unknown",
-            "ip": "192.168.0.107",
-            "min_freq": 680,
-            "max_freq": 700,
-            "min_volt": 1310,
-            "max_volt": 1350,
-            "max_temp": 40,
-            "max_watts": 30,
-            "target_hashrate": 700,
-            "enabled": true
-        },
-        {
-            "nickname": "GAMMA",
-            "type": "Unknown",
-            "ip": "192.168.0.101",
-            "min_freq": 885,
-            "max_freq": 1000,
-            "min_volt": 1260,
-            "max_volt": 1300,
-            "max_temp": 55,
-            "max_watts": 45,
-            "target_hashrate": 2500,
-            "enabled": true
-        }
-    ]
+    "miners": []
 }
