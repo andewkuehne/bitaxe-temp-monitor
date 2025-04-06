@@ -1,4 +1,4 @@
-Frequency (MHz),Core Vottage,target hash rate (TeraHash/s)
+Frequency (MHz),Core Vottage,target_hashrate
 500,1000,1.0
 505,1000,1.0
 510,1000,1.0
