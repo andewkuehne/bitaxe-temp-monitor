@@ -2,10 +2,10 @@ import requests
 import time
 import threading
 from config import load_config, get_miners, get_miner_defaults, detect_miners
+import pandas as pd
 
 # Load global configuration
 config = load_config()
-
 VOLTAGE_STEP = config["voltage_step"]
 FREQUENCY_STEP = config["frequency_step"]
 MONITOR_INTERVAL = config["monitor_interval"]
@@ -13,6 +13,24 @@ TEMP_TOLERANCE = config["temp_tolerance"]
 
 # Global Running Flag
 running = True
+
+def load_scaling_table():
+    try:
+        df = pd.read_excel("cpu_voltage_scaling_safeguards.xlsx")
+        df = df.rename(columns=lambda x: x.strip().lower().replace(" ", "_"))
+        df = df.sort_values(by="frequency_(mhz)").reset_index(drop=True)
+        return df.to_dict(orient="records")
+    except Exception as e:
+        print(f"Failed to load CPU scaling table: {e}")
+        return []
+
+def get_target_hashrate_for_freq(freq, tier_list):
+    """Return expected target hashrate for a given frequency from tier list."""
+    sorted_tiers = sorted(tier_list, key=lambda x: x["frequency_(mhz)"])
+    for tier in reversed(sorted_tiers):
+        if freq >= tier["frequency_(mhz)"]:
+            return tier.get("target_hashrate", 0)
+    return sorted_tiers[0].get("target_hashrate", 0)
 
 def get_system_info(bitaxe_ip):
     """Fetch system info from Bitaxe API."""
@@ -42,26 +60,32 @@ def restart_bitaxe(bitaxe_ip):
     except requests.exceptions.RequestException as e:
         return f"{bitaxe_ip} -> Error restarting system: {e}"
 
+def get_tier_voltage_for_freq(freq, tier_list):
+    """Return voltage for the closest frequency in tier list."""
+    sorted_tiers = sorted(tier_list, key=lambda x: x["frequency_(mhz)"])
+    for tier in reversed(sorted_tiers):
+        if freq >= tier["frequency_(mhz)"]:
+            return tier["voltage"]
+    return sorted_tiers[0]["voltage"]
+
 def monitor_and_adjust(bitaxe_ip, bitaxe_type, interval, log_callback,
-                        min_freq, max_freq, min_volt, max_volt,
-                        max_temp, max_watts, target_hashrate):
+                       min_freq, max_freq, min_volt, max_volt,
+                       max_temp, max_watts, start_freq=None, start_volt=None):
     """Monitor and auto-adjust miner settings dynamically based on user-defined AutoTuner settings."""
-    global running
+    global running, tier_list
     running = True
 
     # Ensure all required settings are present
-    required_fields = [min_freq, max_freq, min_volt, max_volt, max_temp, max_watts, target_hashrate]
+    required_fields = [min_freq, max_freq, min_volt, max_volt, max_temp, max_watts]
     if any(value is None or value == "" for value in required_fields):
         log_callback(f"{bitaxe_ip} -> Missing AutoTuner settings. Skipping tuning.", "error")
         running = False
         return
 
-    current_voltage = min_volt
-    current_frequency = min_freq
+    current_frequency = start_freq if start_freq not in [None, ""] else min_freq
+    current_voltage = start_volt if start_volt not in [None, ""] else min_volt
 
-    voltage_step = VOLTAGE_STEP
-    frequency_step = FREQUENCY_STEP
-    temp_tolerance = TEMP_TOLERANCE
+    target_hashrate = get_target_hashrate_for_freq(current_frequency, tier_list)
 
     frequency_range = max_freq - min_freq
     voltage_range = max_volt - min_volt
@@ -70,9 +94,25 @@ def monitor_and_adjust(bitaxe_ip, bitaxe_type, interval, log_callback,
     applied_settings = set_system_settings(bitaxe_ip, current_voltage, current_frequency)
     log_callback(applied_settings, "info")
 
-    
+    last_config_refresh = 0
+    config = load_config()  # Initial config
 
     while running:
+        if time.time() - last_config_refresh > 5:
+            config = load_config()
+            last_config_refresh = time.time()
+
+            enforce_tiers = config.get("enforce_safe_pairing", False)
+            if enforce_tiers:
+                tier_list = scaling_table
+            else:
+                tier_list = []
+
+        voltage_step = config.get("voltage_step", 10)
+        frequency_step = config.get("frequency_step", 5)
+        temp_tolerance = config.get("temp_tolerance", 2)
+        interval = config.get("monitor_interval", 5)
+
         info = get_system_info(bitaxe_ip)
         if not running:
             break
@@ -84,7 +124,13 @@ def monitor_and_adjust(bitaxe_ip, bitaxe_type, interval, log_callback,
         
         small_core_count = info.get("smallCoreCount")
         asic_count = info.get("asicCount")
-        expected_hashrate = int(current_frequency * ((small_core_count * asic_count) / 1000)) # Calculate expected hashrate
+        expected_hashrate = int(current_frequency * ((small_core_count * asic_count) / 1000))
+
+        # Pull dynamic target hashrate from scaling table
+        target_hashrate = get_target_hashrate_for_freq(current_frequency, tier_list)
+        if target_hashrate is None:
+            log_callback(f"{bitaxe_ip} -> WARNING: No target hashrate found for {current_frequency} MHz", "warning")
+            target_hashrate = expected_hashrate  # Fallback to expected if missing
 
         temp = info.get("temp", 0)
         vr_temp = info.get("vrTemp",0)
@@ -106,19 +152,23 @@ def monitor_and_adjust(bitaxe_ip, bitaxe_type, interval, log_callback,
 
             stepping_down = True # flag to take more time between changes to avoid hashrate falling off cliff
 
-            if current_voltage - voltage_step >= min_volt:
-                new_voltage -= voltage_step
-                log_callback(f"{bitaxe_ip} -> Lowering voltage to {new_voltage}mV.", "warning")
-            if current_frequency - frequency_step >= min_freq:
-                new_frequency -= frequency_step
-                log_callback(f"{bitaxe_ip} -> Lowering frequency to {new_frequency}MHz.", "warning")
-            else:
-                log_callback(f"{bitaxe_ip} -> Minimum settings reached! Holding state.", "error")
+            if temp > max_temp or power_consumption > max_watts:
+                log_callback(f"{bitaxe_ip} -> Overheating detected. Tier step-down engaged.", "error")
+
+                # Drop to next lower tier (if available)
+                tier_freqs = [t["frequency_(mhz)"] for t in tier_list]
+                current_idx = tier_freqs.index(current_frequency) if current_frequency in tier_freqs else -1
+                if current_idx > 0:
+                    new_frequency = tier_freqs[current_idx - 1]
+                    new_voltage = get_tier_voltage_for_freq(new_frequency, tier_list)
+                    log_callback(f"{bitaxe_ip} -> Dropping to tier: {new_frequency} MHz / {new_voltage} mV", "warning")
+                else:
+                    log_callback(f"{bitaxe_ip} -> Already at minimum tier. Holding.", "warning")
 
 
         # NEW STEP-UP LOGIC BASED ON EXPECTED VS ACTUAL HASHRATE AND RANGE OF VOLTAGE AND FREQUENCY
         elif temp < (max_temp - temp_tolerance) and power_consumption < max_watts and hash_rate < expected_hashrate:
-            log_callback(f"{bitaxe_ip} -> Temp {temp}°C is low. Trying to optimize.", "info")
+            log_callback(f"{bitaxe_ip} -> Temp {temp}°C. Checking if program should optimize.", "info")
             # checking in interval steps of 25%
             if ((freq_range_percent >= 0.25 and volt_range_percent <= 0.25) or
                 (freq_range_percent >= 0.5 and volt_range_percent <= 0.5) or
@@ -145,17 +195,16 @@ def monitor_and_adjust(bitaxe_ip, bitaxe_type, interval, log_callback,
         elif hash_rate > expected_hashrate and hash_rate < target_hashrate:
             log_callback(f"{bitaxe_ip} -> Hashrate below target hashrate {target_hashrate} GH/s! Adjusting settings.", "warning")
 
-            if current_frequency + frequency_step <= max_freq:
-                new_frequency += frequency_step
-                freq_range_percent = (new_frequency - min_freq)/frequency_range
-
-                log_callback(f"{bitaxe_ip} -> Increasing frequency to {new_frequency}MHz / {int(freq_range_percent*100)}% to fine-tune hashrate.", "info")
-
-            elif current_voltage + voltage_step <= max_volt:
-                new_voltage += voltage_step
-                volt_range_percent = (new_voltage - min_volt)/voltage_range
-
-                log_callback(f"{bitaxe_ip} -> Increasing voltage to {new_voltage}mV / {int(volt_range_percent*100)}% for hashrate fine-tuning.", "info")
+            # Step-up logic
+            if temp < (max_temp - temp_tolerance) and hash_rate < expected_hashrate:
+                tier_freqs = [t["frequency_(mhz)"] for t in tier_list]
+                current_idx = tier_freqs.index(current_frequency) if current_frequency in tier_freqs else -1
+                if current_idx >= 0 and current_idx + 1 < len(tier_freqs):
+                    new_frequency = tier_freqs[current_idx + 1]
+                    new_voltage = get_tier_voltage_for_freq(new_frequency, tier_list)
+                    log_callback(f"{bitaxe_ip} -> Stepping up to tier: {new_frequency} MHz / {new_voltage} mV", "info")
+                else:
+                    log_callback(f"{bitaxe_ip} -> Already at max tier or unknown freq. No step-up.", "info")
 
             else:
                 log_callback(f"{bitaxe_ip} -> Hashrate is under target of {target_hashrate} GH/s, but already at max safe settings.", "warning")
@@ -218,9 +267,22 @@ def start_autotuning_all(log_callback):
     threads = []
     for miner in miners:
         thread = threading.Thread(target=monitor_and_adjust, args=(
-            miner["ip"], miner["type"], MONITOR_INTERVAL, log_callback
+            miner["ip"], miner["type"], MONITOR_INTERVAL, log_callback,
+            miner.get("min_freq"), miner.get("max_freq"),
+            miner.get("min_volt"), miner.get("max_volt"),
+            miner.get("max_temp"), miner.get("max_watts"),
+            miner.get("start_freq"), miner.get("start_volt")
         ))
+
         thread.start()
         threads.append(thread)
 
     return threads  # Return thread references to manage later
+
+# Load the scaling table once at the start
+scaling_table = load_scaling_table()
+config = load_config()
+enforce_tiers = config.get("enforce_safe_pairing", False)
+
+# Always set tier_list based on enforcement
+tier_list = scaling_table if enforce_tiers else []
