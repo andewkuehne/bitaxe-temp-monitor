@@ -16,7 +16,7 @@ running = True
 
 def load_scaling_table():
     try:
-        df = pd.read_excel("cpu_voltage_scaling_safeguards.xlsx")
+        df = pd.read_csv("cpu_voltage_scaling_safeguards.csv")
         df = df.rename(columns=lambda x: x.strip().lower().replace(" ", "_"))
         df = df.sort_values(by="frequency_(mhz)").reset_index(drop=True)
         return df.to_dict(orient="records")
@@ -101,12 +101,6 @@ def monitor_and_adjust(bitaxe_ip, bitaxe_type, interval, log_callback,
         if time.time() - last_config_refresh > 5:
             config = load_config()
             last_config_refresh = time.time()
-
-            enforce_tiers = config.get("enforce_safe_pairing", False)
-            if enforce_tiers:
-                tier_list = scaling_table
-            else:
-                tier_list = []
 
         voltage_step = config.get("voltage_step", 10)
         frequency_step = config.get("frequency_step", 5)
@@ -232,7 +226,7 @@ def monitor_and_adjust(bitaxe_ip, bitaxe_type, interval, log_callback,
             
             stepping_down = True
 
-            log_callback(f"{bitaxe_ip} -> Inefficinet hashing, decreasing voltage to {new_voltage}V / {int(volt_range_percent*100)}%. Decreasing frequency to {new_frequency}MHz / {int(freq_range_percent*100)}%", "warning")
+            log_callback(f"{bitaxe_ip} -> Inefficient hashing, decreasing voltage to {new_voltage}V / {int(volt_range_percent*100)}%. Decreasing frequency to {new_frequency}MHz / {int(freq_range_percent*100)}%", "warning")
         
         # Apply changes dynamically without restarting
         if new_voltage != current_voltage or new_frequency != current_frequency:
