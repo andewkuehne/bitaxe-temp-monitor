@@ -21,6 +21,9 @@ class BitaxeAutotuningApp:
         self.root.bind("<F11>", self.toggle_fullscreen)
         self.root.bind("<Escape>", self.exit_fullscreen)
 
+        self.global_settings_window = None
+        self.autotuner_window = None
+
         # UI Layout
         tk.Label(self.root, text="- Bitaxe Multi-AutoTuner -", font=("Arial", 18, "bold"), bg="black", fg="gold").pack(
             pady=10)
@@ -96,9 +99,10 @@ class BitaxeAutotuningApp:
         start_stop_inner_frame.pack(expand=True)
 
         self.start_button = tk.Button(start_stop_inner_frame, text="Start Autotuner", command=self.start_autotuning,
-                                      font=("Arial", 10, "bold"), bg="gold")
+                                      font=("Arial", 10, "bold"), width=15, bg="gold")
         self.stop_button = tk.Button(start_stop_inner_frame, text="Stop Autotuner", command=self.stop_autotuning,
-                                     font=("Arial", 10, "bold"), bg="gold")
+                                     font=("Arial", 10, "bold"), width=15, bg="gold")
+
 
         # Use grid layout to center buttons
         self.start_button.grid(row=0, column=0, padx=5, pady=5)
@@ -306,6 +310,78 @@ class BitaxeAutotuningApp:
 
         tk.Button(edit_window, text="Save", font=("Arial", 10), command=save_miner_settings, bg="gold").pack(pady=10)
 
+    def open_global_settings(self):
+        """Opens a settings window for modifying global autotuner parameters."""
+        if self.global_settings_window and tk.Toplevel.winfo_exists(self.global_settings_window):
+            self.global_settings_window.lift()
+            return
+
+        self.global_settings_window = tk.Toplevel(self.root)
+        self.global_settings_window.title("Global Settings")
+        self.global_settings_window.geometry("650x350")
+        self.global_settings_window.config(bg="white")
+
+        def on_close():
+            self.global_settings_window.destroy()
+            self.global_settings_window = None
+
+        self.global_settings_window.protocol("WM_DELETE_WINDOW", on_close)
+
+        tk.Label(self.global_settings_window, text="Modify Settings", font=("Arial", 12, "bold"), bg="white").pack(
+            pady=10)
+
+        # Load current settings
+        config = load_config()
+
+        settings_entries = {}
+        settings_fields = {
+            "voltage_step": "Voltage Step (mV):",
+            "frequency_step": "Frequency Step (MHz):",
+            "monitor_interval": "Monitor Interval (sec):",
+            "default_target_temp": "Default Target Temp (°C):",
+            "temp_tolerance": "Temp Tolerance (°C):",
+            "refresh_interval": "Autotuner Update Interval (sec):"
+        }
+
+        # Create input fields
+        input_frame = tk.Frame(self.global_settings_window, bg="white")
+        input_frame.pack(padx=20, pady=10, fill=tk.X)
+
+        for key, label_text in settings_fields.items():
+            row_frame = tk.Frame(input_frame, bg="white")
+            row_frame.pack(fill=tk.X, pady=2)
+
+            tk.Label(row_frame, text=label_text, font=("Arial", 11), bg="white").pack(side=tk.LEFT)
+
+            entry = tk.Entry(row_frame, font=("Arial", 11), width=10)
+            entry.insert(0, str(config.get(key, "")))
+            entry.pack(side=tk.RIGHT, padx=10)
+            settings_entries[key] = entry
+
+        # Add checkbox for tier enforcement
+        enforce_var = tk.BooleanVar(value=config.get("enforce_safe_pairing", False))
+        tier_checkbox = tk.Checkbutton(self.global_settings_window,
+                                       text="Enforce Safe Frequency/Voltage Tiers (from 'cpu_voltage_scaling_safeguards.xlsx')",
+                                       variable=enforce_var,
+                                       font=("Arial", 10),
+                                       bg="white")
+        tier_checkbox.pack(pady=5)
+
+        def save_global_settings():
+            """Saves global settings to config.json."""
+            try:
+                new_settings = {key: int(entry.get()) for key, entry in settings_entries.items()}
+                new_settings["enforce_safe_pairing"] = enforce_var.get()
+                config.update(new_settings)
+                save_config(config)
+                messagebox.showinfo("Success", "Settings updated successfully.")
+                self.global_settings_window.destroy()
+                self.log_message("Global settings updated.", "success")
+            except ValueError:
+                messagebox.showerror("Error", "Please enter valid integer values.")
+
+        tk.Button(self.global_settings_window, text="Save", font=("Arial", 10), width=10, bg="gold", command=save_global_settings).pack(pady=10)
+
     def open_autotuner_settings(self):
         """Opens a window to modify AutoTuner settings for all miners, with a scrollbar for large lists."""
         config = load_config()
@@ -315,15 +391,25 @@ class BitaxeAutotuningApp:
             messagebox.showwarning("No Miners Found", "Please add a miner first before modifying AutoTuner settings.")
             return
 
-        autotuner_window = tk.Toplevel(self.root)
-        autotuner_window.title("AutoTuner Settings")
-        autotuner_window.geometry("1150x500")
-        autotuner_window.config(bg="white")
+        if self.autotuner_window and tk.Toplevel.winfo_exists(self.autotuner_window):
+            self.autotuner_window.lift()
+            return
 
-        tk.Label(autotuner_window, text="Modify AutoTuner Settings", font=("Arial", 12, "bold"), bg="white").pack(
+        self.autotuner_window = tk.Toplevel(self.root)
+        self.autotuner_window.title("AutoTuner Settings")
+        self.autotuner_window.geometry("1250x500")
+        self.autotuner_window.config(bg="white")
+
+        def on_close():
+            self.autotuner_window.destroy()
+            self.autotuner_window = None
+
+        self.autotuner_window.protocol("WM_DELETE_WINDOW", on_close)
+
+        tk.Label(self.autotuner_window, text="Modify AutoTuner Settings", font=("Arial", 12, "bold"), bg="white").pack(
             pady=10)
 
-        container = tk.Frame(autotuner_window, bg="white")
+        container = tk.Frame(self.autotuner_window, bg="white")
         container.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
 
         canvas = tk.Canvas(container, bg="white")
@@ -340,8 +426,8 @@ class BitaxeAutotuningApp:
         canvas.pack(side="left", fill="both", expand=True)
         scrollbar.pack(side="right", fill="y")
 
-        headers = ["Enable", "Miner", "Min Freq", "Max Freq", "Min Volt", "Max Volt", "Max Temp", "Max Watts",
-                   "Target Hashrate", "Actions"]
+        headers = ["Enable", "Miner", "Min Freq", "Max Freq", "Start Freq", "Min Volt", "Max Volt", "Start Volt",
+                   "Max Temp", "Max Watts", "Actions"]
 
         # Create table headers
         for col_idx, header in enumerate(headers):
@@ -396,7 +482,9 @@ class BitaxeAutotuningApp:
             tk.Label(scrollable_frame, text=f"{miner['nickname']} ({miner['ip']})", bg="white",
                      font=("Arial", 10)).grid(row=row_idx, column=1, padx=5, pady=5, sticky="w")
 
-            fields = ["min_freq", "max_freq", "min_volt", "max_volt", "max_temp", "max_watts", "target_hashrate"]
+            fields = ["min_freq", "max_freq", "start_freq", "min_volt", "max_volt", "start_volt", "max_temp",
+                      "max_watts"]
+
             miner_settings = {}
 
             for col_idx, field in enumerate(fields, start=2):
@@ -435,9 +523,9 @@ class BitaxeAutotuningApp:
             save_config(config)
             self.log_message("Updated AutoTuner settings for all miners.", "success")
             messagebox.showinfo("Settings Saved", "AutoTuner settings have been successfully saved!")
-            autotuner_window.destroy()
+            self.autotuner_window.destroy()
 
-        tk.Button(autotuner_window, text="Save", font=("Arial", 10), width=10, bg="gold",
+        tk.Button(self.autotuner_window, text="Save", font=("Arial", 10), width=10, bg="gold",
                   command=save_autotuner_settings).pack(
             pady=10
         )
@@ -473,61 +561,10 @@ class BitaxeAutotuningApp:
 
         self.log_message("Miner(s) removed successfully.", "success")
 
-    def open_global_settings(self):
-        """Opens a settings window for modifying global autotuner parameters."""
-        global_settings_window = tk.Toplevel(self.root)
-        global_settings_window.title("Global Settings")
-        global_settings_window.geometry("450x300")
-        global_settings_window.config(bg="white")
-
-        tk.Label(global_settings_window, text="Modify Settings", font=("Arial", 12, "bold"), bg="white").pack(pady=10)
-
-        # Load current settings
-        config = load_config()
-
-        settings_entries = {}
-        settings_fields = {
-            "voltage_step": "Voltage Step (mV):",
-            "frequency_step": "Frequency Step (MHz):",
-            "monitor_interval": "Monitor Interval (sec):",
-            "default_target_temp": "Default Target Temp (°C):",
-            "temp_tolerance": "Temp Tolerance (°C):",
-            "refresh_interval": "Autotuner Update Interval (sec):"
-        }
-
-        # Create input fields
-        input_frame = tk.Frame(global_settings_window, bg="white")
-        input_frame.pack(padx=20, pady=10, fill=tk.X)
-
-        for key, label_text in settings_fields.items():
-            row_frame = tk.Frame(input_frame, bg="white")
-            row_frame.pack(fill=tk.X, pady=2)
-
-            tk.Label(row_frame, text=label_text, font=("Arial", 11), bg="white").pack(side=tk.LEFT)
-
-            entry = tk.Entry(row_frame, font=("Arial", 11), width=10)
-            entry.insert(0, str(config.get(key, "")))
-            entry.pack(side=tk.RIGHT, padx=10)
-            settings_entries[key] = entry
-
-        def save_global_settings():
-            """Saves global settings to config.json."""
-            try:
-                new_settings = {key: int(entry.get()) for key, entry in settings_entries.items()}
-                config.update(new_settings)
-                save_config(config)
-                messagebox.showinfo("Success", "Settings updated successfully.")
-                global_settings_window.destroy()
-                self.log_message("Global settings updated.", "success")
-            except ValueError:
-                messagebox.showerror("Error", "Please enter valid integer values.")
-
-        tk.Button(global_settings_window, text="Save", font=("Arial", 10), command=save_global_settings,
-                  bg="white").pack(pady=10)
-
     def save_settings(self):
         """Saves all miner tuning settings and miner details to config.json."""
         config = load_config()  # Load existing config
+        existing_miners = config.get("miners", [])
 
         updated_miners = []
 
@@ -541,17 +578,23 @@ class BitaxeAutotuningApp:
             # Retrieve tuning settings from stored config
             miner_defaults = get_miner_defaults(ip)
 
+            # Preserve 'enabled' flag from existing config
+            matching_existing = next((m for m in existing_miners if m["ip"] == ip), {})
+            enabled = matching_existing.get("enabled", False)
+
             updated_miner = {
                 "nickname": nickname,
                 "type": miner_type,
                 "ip": ip,
                 "min_freq": miner_defaults.get("min_freq", ""),
                 "max_freq": miner_defaults.get("max_freq", ""),
+                "start_freq": miner_defaults.get("start_freq", ""),
                 "min_volt": miner_defaults.get("min_volt", ""),
                 "max_volt": miner_defaults.get("max_volt", ""),
+                "start_volt": miner_defaults.get("start_volt", ""),
                 "max_temp": miner_defaults.get("max_temp", ""),
                 "max_watts": miner_defaults.get("max_watts", ""),
-                "target_hashrate": miner_defaults.get("target_hashrate", "")
+                "enabled": enabled
             }
 
             updated_miners.append(updated_miner)
@@ -575,12 +618,15 @@ class BitaxeAutotuningApp:
         self.running = True
         self.threads.clear()
 
-        config = load_config()  # Load the latest config
+        self.start_button.config(text="Autotuner Running", state=tk.DISABLED, bg="light green")
+
+        config = load_config()  # Reload latest settings including updated monitor_interval
+        interval = config.get("monitor_interval", 5)  # Refresh it here just once
 
         self.log_message("Checking AutoTuner settings before starting...", "info")
 
         missing_settings = []
-        required_fields = ["min_freq", "max_freq", "min_volt", "max_volt", "max_temp", "max_watts", "target_hashrate"]
+        required_fields = ["min_freq", "max_freq", "min_volt", "max_volt", "max_temp", "max_watts"]
 
         # Validate that each miner has all required AutoTuner settings
         for miner in config.get("miners", []):
@@ -622,16 +668,19 @@ class BitaxeAutotuningApp:
             max_volt = miner.get("max_volt", 0)
             max_temp = miner.get("max_temp", 0)
             max_watts = miner.get("max_watts", 0)
-            target_hashrate = miner.get("target_hashrate", 0)
             interval = config.get("monitor_interval", 10)  # Global setting
 
             # Pass settings dynamically to `monitor_and_adjust`
+            start_freq = miner.get("start_freq", "")
+            start_volt = miner.get("start_volt", "")
+
             thread = threading.Thread(
                 target=monitor_and_adjust,
                 args=(ip, bitaxe_type, interval, self.log_message,
                       min_freq, max_freq, min_volt, max_volt,
-                      max_temp, max_watts, target_hashrate)
+                      max_temp, max_watts, start_freq, start_volt)
             )
+
             thread.start()
             self.threads.append(thread)
 
@@ -642,6 +691,9 @@ class BitaxeAutotuningApp:
         """Stops all autotuning processes."""
         self.running = False
         stop_autotuning()
+
+        self.start_button.config(text="Start Autotuner", state=tk.NORMAL, bg="gold")
+
         self.log_message("Stopping autotuning...", "warning")
 
     def show_tree_menu(self, event):
@@ -683,6 +735,8 @@ class BitaxeAutotuningApp:
             self.tree.item(item, values=updated_values)
 
         # schedule the next update based on monitor interval
+        config = load_config()
+        interval = config.get("monitor_interval", 5)
         self.root.after(interval * 1000, self.update_miner_display, interval)
 
     def log_message(self, message, level="info"):
@@ -703,12 +757,14 @@ class BitaxeAutotuningApp:
         if self.root.winfo_exists():  # Prevent calls after window is closed
             self.root.after(0, _update_log)
 
-
     def run(self):
         """Runs the Tkinter event loop."""
         self.root.mainloop()
 
 
 if __name__ == "__main__":
-    app = BitaxeAutotuningApp()
-    app.run()
+    try:
+        app = BitaxeAutotuningApp()
+        app.run()
+    except KeyboardInterrupt:
+        print("Program interrupted and exiting cleanly...")
