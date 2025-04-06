@@ -67,23 +67,23 @@ class BitaxeAutotuningApp:
         # Create buttons
         self.scan_button = tk.Button(control_inner_frame, text="Scan Network", command=self.scan_network,
                                      **button_style)
-        self.global_settings_button = tk.Button(control_inner_frame, text="Global Settings",
-                                                command=self.open_global_settings, **button_style)
         self.add_button = tk.Button(control_inner_frame, text="Add Miner", command=self.add_miner, **button_style)
         self.delete_button = tk.Button(control_inner_frame, text="Remove Miner", command=self.delete_miner,
                                        **button_style)
-        self.save_settings_button = tk.Button(control_inner_frame, text="Save Settings", command=self.save_settings,
-                                              **button_style)
+        self.global_settings_button = tk.Button(control_inner_frame, text="Global Settings",
+                                                command=self.open_global_settings, **button_style)
         self.autotuner_settings_button = tk.Button(control_inner_frame, text="AutoTuner Settings",
                                                    command=self.open_autotuner_settings, **button_style)
+        self.save_settings_button = tk.Button(control_inner_frame, text="Save Settings", command=self.save_settings,
+                                              **button_style)
 
         # Use grid layout to center buttons
         self.scan_button.grid(row=0, column=0, padx=5, pady=5)
-        self.global_settings_button.grid(row=0, column=1, padx=5, pady=5)
-        self.add_button.grid(row=0, column=2, padx=5, pady=5)
-        self.delete_button.grid(row=0, column=3, padx=5, pady=5)
-        self.save_settings_button.grid(row=0, column=4, padx=5, pady=5)
-        self.autotuner_settings_button.grid(row=0, column=5, padx=5, pady=5)
+        self.add_button.grid(row=0, column=1, padx=5, pady=5)
+        self.delete_button.grid(row=0, column=2, padx=5, pady=5)
+        self.global_settings_button.grid(row=0, column=3, padx=5, pady=5)
+        self.autotuner_settings_button.grid(row=0, column=4, padx=5, pady=5)
+        self.save_settings_button.grid(row=0, column=5, padx=5, pady=5)
 
         # Center the button container inside control_frame
         control_inner_frame.pack(anchor="center")
@@ -539,7 +539,7 @@ class BitaxeAutotuningApp:
             ip = values[2]
 
             # Retrieve tuning settings from stored config
-            miner_defaults = get_miner_defaults(miner_type)
+            miner_defaults = get_miner_defaults(ip)
 
             updated_miner = {
                 "nickname": nickname,
