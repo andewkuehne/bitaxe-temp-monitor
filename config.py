@@ -78,6 +78,7 @@ def get_default_config():
         "default_target_temp": 50,
         "temp_tolerance": 2,
         "refresh_interval": 5,  # Default miner status refresh rate in seconds
+        "enforce_safe_pairing": True,
         "miners": []  # No predefined models, settings are per miner
     }
 
@@ -104,8 +105,10 @@ def add_miner(miner_type, ip, nickname=""):
         "ip": ip,
         "min_freq": "",
         "max_freq": "",
+        "start_freq": "",
         "min_volt": "",
         "max_volt": "",
+        "start_volt": "",
         "max_temp": "",
         "max_watts": "",
         "target_hashrate": ""
