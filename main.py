@@ -1,5 +1,9 @@
 from gui import BitaxeAutotuningApp
 
 if __name__ == "__main__":
-    app = BitaxeAutotuningApp()
-    app.run()
+    try:
+        app = BitaxeAutotuningApp()
+        app.run()
+    except KeyboardInterrupt:
+        print("Program interrupted and exiting cleanly...")
+
