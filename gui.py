@@ -3,14 +3,25 @@ from tkinter import scrolledtext, ttk, messagebox
 import threading
 from datetime import datetime
 from config import get_miner_defaults, add_miner, remove_miner, get_miners, update_miner, load_config, save_config, detect_miners
-from autotune import monitor_and_adjust, stop_autotuning, get_system_info
+from autotune import monitor_and_adjust, stop_autotuning, get_system_info, restart_bitaxe
+import os
+import sys
+import time
 
+def resource_path(relative_path):
+    """Get absolute path to resource (for PyInstaller compatibility)"""
+    try:
+        base_path = sys._MEIPASS  # When running from PyInstaller bundle
+    except Exception:
+        base_path = os.path.abspath(".")
+    return os.path.join(base_path, relative_path)
 
 class BitaxeAutotuningApp:
     def __init__(self):
         self.root = tk.Tk()
         self.root.title("Bitaxe Multi Autotuner")
-        self.root.geometry("1200x700")
+        self.root.geometry("1300x700")
+        self.root.iconbitmap(resource_path("bitaxe_icon.ico"))
         self.root.config(bg="black")
         self.root.resizable(True, True)
 
@@ -36,8 +47,8 @@ class BitaxeAutotuningApp:
 
         # Miner Configuration Table
         self.tree = ttk.Treeview(self.root, columns=(
-            "Nickname", "Type", "IP", "Applied Freq", "Current Voltage mVA", "Current Temp", "Current Hash Rate",
-            "Current Watts"
+            "Nickname", "Type", "IP", "Applied Freq", "Current Voltage mVA", "Current Temp",
+            "VR Temp", "Current Hash Rate", "Current Watts"
         ), show="headings", height=5, style="Treeview")
 
         # Add Column Headings
@@ -115,6 +126,7 @@ class BitaxeAutotuningApp:
         self.tree_menu = tk.Menu(self.root, tearoff=0)
         self.tree_menu.add_command(label="Edit Miner Settings", command=self.edit_miner_settings)  # Added Edit Miner
         self.tree_menu.add_command(label="Refresh", command=self.refresh_selected_miner)
+        self.tree_menu.add_command(label="Restart Miner", command=self.restart_selected_miner)
 
         # Bind right-click event to the miner table
         self.tree.bind("<Button-3>", self.show_tree_menu)
@@ -123,14 +135,18 @@ class BitaxeAutotuningApp:
         self.log_output = scrolledtext.ScrolledText(self.root, width=100, height=15, bg="white")
         self.log_output.pack(pady=5, fill=tk.BOTH, expand=True)
 
+        self.tree_items_by_ip = {}  # map IP to Treeview row ID
+
         # Load miners from config.json on startup
         self.load_miners_from_config()
+
 
     def scan_network(self):
         """Opens a window to allow the user to enter a custom IP range for scanning."""
         scan_window = tk.Toplevel(self.root)
         scan_window.title("Scan Network")
         scan_window.geometry("400x200")
+        scan_window.iconbitmap(resource_path("bitaxe_icon.ico"))
         scan_window.config(bg="white")
 
         tk.Label(scan_window, text="Enter IP Range to Scan", font=("Arial", 12, "bold"), bg="white").pack(pady=10)
@@ -176,8 +192,9 @@ class BitaxeAutotuningApp:
 
         for miner in miners:
             values = (
-            miner.get("nickname", f"Miner-{miner['ip']}"), miner["type"], miner["ip"], "-", "-", "-", "-", "-")
-            self.tree.insert("", "end", values=values)
+            miner.get("nickname", f"Miner-{miner['ip']}"), miner["type"], miner["ip"], "-", "-", "-", "-", "-", "-")
+            item_id = self.tree.insert("", "end", values=values)
+            self.tree_items_by_ip[miner["ip"]] = item_id
 
         self.log_message(f"Loaded {len(miners)} miners.", "success")
 
@@ -186,13 +203,16 @@ class BitaxeAutotuningApp:
         add_window = tk.Toplevel(self.root)
         add_window.title("Add Miner")
         add_window.geometry("400x200")
+        add_window.iconbitmap(resource_path("bitaxe_icon.ico"))
         add_window.config(bg="white")
 
-        tk.Label(add_window, text="Nickname:", bg="white", font=("Arial", 10)).grid(row=0, column=0, sticky="w", padx=10)
+        tk.Label(add_window, text="Nickname:", bg="white", font=("Arial", 10)).grid(row=0, column=0, sticky="w",
+                                                                                    padx=10)
         nickname_entry = tk.Entry(add_window, width=20)
         nickname_entry.grid(row=0, column=1, padx=10, pady=2)
 
-        tk.Label(add_window, text="IP Address:", bg="white", font=("Arial", 10)).grid(row=1, column=0, sticky="w", padx=10)
+        tk.Label(add_window, text="IP Address:", bg="white", font=("Arial", 10)).grid(row=1, column=0, sticky="w",
+                                                                                      padx=10)
         ip_entry = tk.Entry(add_window, width=20)
         ip_entry.grid(row=1, column=1, padx=10, pady=2)
 
@@ -203,13 +223,47 @@ class BitaxeAutotuningApp:
                 messagebox.showerror("Error", "IP Address is required.")
                 return
 
-            self.tree.insert("", "end", values=(nickname, "Unknown", ip, "-", "-", "-", "-", "-"))
+            item_id = self.tree.insert("", "end", values=(nickname, "Unknown", ip, "-", "-", "-", "-", "-", "-"))
+            self.tree_items_by_ip[ip] = item_id  # ✅ Track the new item
             add_miner("Unknown", ip, nickname)
             messagebox.showinfo("Success", f"Miner {nickname} added successfully.")
             add_window.destroy()
 
-        add_button = tk.Button(add_window, text="Add", font=("Arial", 10), command=add_entry, bg="white")
-        add_button.grid(row=2, column=0, columnspan=2, pady=10)
+        tk.Button(add_window, text="Add", font=("Arial", 10), command=add_entry, bg="white").grid(
+            row=2, column=0, columnspan=2, pady=10)
+
+    def delete_miner(self):
+        """Deletes the selected miner from the UI and config.json."""
+        selected_items = self.tree.selection()
+
+        if not selected_items:
+            messagebox.showwarning("No Selection", "Please select a miner to delete.")
+            return
+
+        confirmation = messagebox.askyesno("Delete Miner", "Are you sure you want to remove the selected miner(s)?")
+        if not confirmation:
+            return
+
+        config = load_config()
+        miners = config.get("miners", [])
+
+        for item in selected_items:
+            values = self.tree.item(item, "values")
+            ip = values[2]
+
+            # Remove from treeview
+            self.tree.delete(item)
+
+            # ✅ Remove from IP-to-row map
+            if ip in self.tree_items_by_ip:
+                del self.tree_items_by_ip[ip]
+
+            # Remove from config
+            miners = [m for m in miners if m["ip"] != ip]
+
+        config["miners"] = miners
+        save_config(config)
+        self.log_message("Miner(s) removed successfully.", "success")
 
     def refresh_selected_miner(self):
         """Fetches and updates real-time data for the selected miner."""
@@ -318,12 +372,28 @@ class BitaxeAutotuningApp:
 
         self.global_settings_window = tk.Toplevel(self.root)
         self.global_settings_window.title("Global Settings")
-        self.global_settings_window.geometry("650x350")
+        self.global_settings_window.geometry("650x425")
+        self.global_settings_window.iconbitmap(resource_path("bitaxe_icon.ico"))
         self.global_settings_window.config(bg="white")
 
         def on_close():
             self.global_settings_window.destroy()
             self.global_settings_window = None
+
+        def save_global_settings():
+            """Saves global settings to config.json."""
+            try:
+                new_settings = {key: int(entry.get()) for key, entry in settings_entries.items()}
+                new_settings["enforce_safe_pairing"] = enforce_var.get()
+                new_settings["daily_reset_enabled"] = reset_var.get()
+                new_settings["daily_reset_time"] = time_entry.get().strip()
+                config.update(new_settings)
+                save_config(config)
+                messagebox.showinfo("Success", "Settings updated successfully.")
+                self.global_settings_window.destroy()
+                self.log_message("Global settings updated.", "success")
+            except ValueError:
+                messagebox.showerror("Error", "Please enter valid integer values.")
 
         self.global_settings_window.protocol("WM_DELETE_WINDOW", on_close)
 
@@ -367,18 +437,23 @@ class BitaxeAutotuningApp:
                                        bg="white")
         tier_checkbox.pack(pady=5)
 
-        def save_global_settings():
-            """Saves global settings to config.json."""
-            try:
-                new_settings = {key: int(entry.get()) for key, entry in settings_entries.items()}
-                new_settings["enforce_safe_pairing"] = enforce_var.get()
-                config.update(new_settings)
-                save_config(config)
-                messagebox.showinfo("Success", "Settings updated successfully.")
-                self.global_settings_window.destroy()
-                self.log_message("Global settings updated.", "success")
-            except ValueError:
-                messagebox.showerror("Error", "Please enter valid integer values.")
+        # Daily Reset Checkbox and Time Entry
+        reset_var = tk.BooleanVar(value=config.get("daily_reset_enabled", False))
+        reset_checkbox = tk.Checkbutton(self.global_settings_window,
+                                        text="Enable Daily Miner Reset", variable=reset_var,
+                                        font=("Arial", 10), bg="white")
+        reset_checkbox.pack(pady=5)
+
+        time_label = tk.Label(
+            self.global_settings_window,
+            text="Daily Reset Time (HH:MM, 24-hour format):",
+            font=("Arial", 10),
+            bg="white"
+        )
+        time_label.pack()
+        time_entry = tk.Entry(self.global_settings_window, font=("Arial", 10), width=10)
+        time_entry.insert(0, config.get("daily_reset_time", "03:00"))
+        time_entry.pack(pady=2)
 
         tk.Button(self.global_settings_window, text="Save", font=("Arial", 10), width=10, bg="gold", command=save_global_settings).pack(pady=10)
 
@@ -398,6 +473,7 @@ class BitaxeAutotuningApp:
         self.autotuner_window = tk.Toplevel(self.root)
         self.autotuner_window.title("AutoTuner Settings")
         self.autotuner_window.geometry("1250x500")
+        self.autotuner_window.iconbitmap(resource_path("bitaxe_icon.ico"))
         self.autotuner_window.config(bg="white")
 
         def on_close():
@@ -427,7 +503,7 @@ class BitaxeAutotuningApp:
         scrollbar.pack(side="right", fill="y")
 
         headers = ["Enable", "Miner", "Min Freq", "Max Freq", "Start Freq", "Min Volt", "Max Volt", "Start Volt",
-                   "Max Temp", "Max Watts", "Actions"]
+                   "Max Temp", "Max Watts", "Max VR Temp", "Actions"]
 
         # Create table headers
         for col_idx, header in enumerate(headers):
@@ -482,8 +558,8 @@ class BitaxeAutotuningApp:
             tk.Label(scrollable_frame, text=f"{miner['nickname']} ({miner['ip']})", bg="white",
                      font=("Arial", 10)).grid(row=row_idx, column=1, padx=5, pady=5, sticky="w")
 
-            fields = ["min_freq", "max_freq", "start_freq", "min_volt", "max_volt", "start_volt", "max_temp",
-                      "max_watts"]
+            fields = ["min_freq", "max_freq", "start_freq", "min_volt", "max_volt",
+                      "start_volt", "max_temp", "max_watts", "max_vr_temp"]
 
             miner_settings = {}
 
@@ -530,37 +606,6 @@ class BitaxeAutotuningApp:
             pady=10
         )
 
-    def delete_miner(self):
-        """Deletes the selected miner from the UI and config.json."""
-        selected_items = self.tree.selection()
-
-        if not selected_items:
-            messagebox.showwarning("No Selection", "Please select a miner to delete.")
-            return
-
-        confirmation = messagebox.askyesno("Delete Miner", "Are you sure you want to remove the selected miner(s)?")
-        if not confirmation:
-            return
-
-        config = load_config()  # Load the current configuration
-        miners = config.get("miners", [])  # Get the list of miners
-
-        for item in selected_items:
-            values = self.tree.item(item, "values")
-            ip = values[2]  # Extract miner's IP address
-
-            # Remove miner from UI
-            self.tree.delete(item)
-
-            # Remove miner from config.json
-            miners = [miner for miner in miners if miner["ip"] != ip]
-
-        # Update config.json to remove deleted miners
-        config["miners"] = miners
-        save_config(config)  # Save changes to config.json
-
-        self.log_message("Miner(s) removed successfully.", "success")
-
     def save_settings(self):
         """Saves all miner tuning settings and miner details to config.json."""
         config = load_config()  # Load existing config
@@ -594,6 +639,7 @@ class BitaxeAutotuningApp:
                 "start_volt": miner_defaults.get("start_volt", ""),
                 "max_temp": miner_defaults.get("max_temp", ""),
                 "max_watts": miner_defaults.get("max_watts", ""),
+                "max_vr_temp": miner_defaults.get("max_vr_temp", ""),
                 "enabled": enabled
             }
 
@@ -668,6 +714,7 @@ class BitaxeAutotuningApp:
             max_volt = miner.get("max_volt", 0)
             max_temp = miner.get("max_temp", 0)
             max_watts = miner.get("max_watts", 0)
+            max_vr_temp = miner.get("max_vr_temp", 0)
             interval = config.get("monitor_interval", 10)  # Global setting
 
             # Pass settings dynamically to `monitor_and_adjust`
@@ -678,7 +725,7 @@ class BitaxeAutotuningApp:
                 target=monitor_and_adjust,
                 args=(ip, bitaxe_type, interval, self.log_message,
                       min_freq, max_freq, min_volt, max_volt,
-                      max_temp, max_watts, start_freq, start_volt)
+                      max_temp, max_watts, start_freq, start_volt, max_vr_temp)
             )
 
             thread.start()
@@ -686,6 +733,9 @@ class BitaxeAutotuningApp:
 
         # Ensure UI updates based on monitor interval
         self.update_miner_display(interval)
+
+        # Start a new thread that watches the time and resets all miners at the configured time
+        threading.Thread(target=self.daily_reset_watcher, daemon=True).start()
 
     def stop_autotuning(self):
         """Stops all autotuning processes."""
@@ -708,9 +758,7 @@ class BitaxeAutotuningApp:
         if not self.running:
             return
 
-        for item in self.tree.get_children():
-            values = self.tree.item(item, "values")
-            ip = values[2]  # Extract miner's IP address
+        for ip, item in self.tree_items_by_ip.items():
 
             miner_data = get_system_info(ip)
             if isinstance(miner_data, str):
@@ -721,16 +769,19 @@ class BitaxeAutotuningApp:
             new_frequency = miner_data.get("frequency", "-")
             new_voltage = miner_data.get("coreVoltage", "-")
             new_temp = f"{miner_data.get('temp', '-')}°C"
+            new_vr_temp = f"{miner_data.get('vrTemp', '-')}°C"
             new_hashrate = f"{float(miner_data.get('hashRate', 0)):.2f} GH/s"
             new_power = f"{float(miner_data.get('power', 0)):.2f} W"
 
             # Update UI
+            values = self.tree.item(item, "values")
             updated_values = list(values)
             updated_values[3] = new_frequency  # Applied Frequency
             updated_values[4] = new_voltage  # Current Voltage
             updated_values[5] = new_temp  # Current Temp
-            updated_values[6] = new_hashrate  # Current Hashrate
-            updated_values[7] = new_power  # Current Power Usage
+            updated_values[6] = new_vr_temp
+            updated_values[7] = new_hashrate  # Current Hashrate
+            updated_values[8] = new_power  # Current Power Usage
 
             self.tree.item(item, values=updated_values)
 
@@ -756,6 +807,34 @@ class BitaxeAutotuningApp:
         # Ensure Tkinter UI updates run on the main thread
         if self.root.winfo_exists():  # Prevent calls after window is closed
             self.root.after(0, _update_log)
+
+    def daily_reset_watcher(self):
+        while True:
+            config = load_config()
+            if config.get("daily_reset_enabled", False):
+                now = datetime.now().strftime("%H:%M")
+                if now == config.get("daily_reset_time", "03:00"):
+                    self.log_message("Daily reset triggered. Restarting all miners...", "warning")
+                    for miner in get_miners():
+                        ip = miner["ip"]
+                        msg = restart_bitaxe(ip)
+                        self.log_message(msg, "warning")
+                    time.sleep(60)  # Prevent multiple resets in one minute
+            time.sleep(10)
+
+    def restart_selected_miner(self):
+        """Restarts the selected miner via API."""
+        selected_item = self.tree.selection()
+        if not selected_item:
+            messagebox.showwarning("No Selection", "Please select a miner to restart.")
+            return
+
+        values = self.tree.item(selected_item, "values")
+        ip = values[2]
+        self.log_message(f"Restarting miner at {ip}...", "warning")
+        msg = restart_bitaxe(ip)
+        self.log_message(msg, "warning")
+        messagebox.showinfo("Restart Triggered", msg)
 
     def run(self):
         """Runs the Tkinter event loop."""
