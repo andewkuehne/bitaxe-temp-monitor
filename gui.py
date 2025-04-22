@@ -7,6 +7,8 @@ from autotune import monitor_and_adjust, stop_autotuning, get_system_info, resta
 import os
 import sys
 import time
+import webbrowser
+
 
 def resource_path(relative_path):
     """Get absolute path to resource (for PyInstaller compatibility)"""
@@ -127,6 +129,8 @@ class BitaxeAutotuningApp:
         self.tree_menu.add_command(label="Edit Miner Settings", command=self.edit_miner_settings)  # Added Edit Miner
         self.tree_menu.add_command(label="Refresh", command=self.refresh_selected_miner)
         self.tree_menu.add_command(label="Restart Miner", command=self.restart_selected_miner)
+        self.tree_menu.add_separator()
+        self.tree_menu.add_command(label="Open Miner Web UI", command=self.open_miner_webpage)
 
         # Bind right-click event to the miner table
         self.tree.bind("<Button-3>", self.show_tree_menu)
@@ -140,6 +144,18 @@ class BitaxeAutotuningApp:
         # Load miners from config.json on startup
         self.load_miners_from_config()
 
+    def open_miner_webpage(self):
+        """Opens the selected miner's IP address in the default web browser."""
+        selected_item = self.tree.selection()
+        if not selected_item:
+            messagebox.showwarning("No Selection", "Please select a miner to open.")
+            return
+
+        values = self.tree.item(selected_item, "values")
+        ip = values[2]
+        url = f"http://{ip}"
+        self.log_message(f"Opening web UI for miner at {ip}", "info")
+        webbrowser.open(url)
 
     def scan_network(self):
         """Opens a window to allow the user to enter a custom IP range for scanning."""
