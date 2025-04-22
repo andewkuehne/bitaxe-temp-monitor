@@ -70,7 +70,7 @@ def get_tier_voltage_for_freq(freq, tier_list):
 
 def monitor_and_adjust(bitaxe_ip, bitaxe_type, interval, log_callback,
                        min_freq, max_freq, min_volt, max_volt,
-                       max_temp, max_watts, start_freq=None, start_volt=None):
+                       max_temp, max_watts, start_freq=None, start_volt=None, max_vr_temp=None):
     """Monitor and auto-adjust miner settings dynamically based on user-defined AutoTuner settings."""
     global running, tier_list
     running = True
@@ -141,23 +141,32 @@ def monitor_and_adjust(bitaxe_ip, bitaxe_type, interval, log_callback,
         stepping_down = False
 
         # **STEP-DOWN LOGIC**
-        if temp is None or power_consumption > max_watts or temp > max_temp or vr_temp > (max_temp * 1.5):
-            log_callback(f"{bitaxe_ip} -> Overheating by ({temp}/{max_temp}°C) or Power Limit of {max_watts}W Exceeded! Using {round(power_consumption,2)}W...Lowering settings.", "error")
+        if temp is None or power_consumption > max_watts or temp > max_temp or vr_temp > max_vr_temp:
+            if temp is None:
+                log_callback(f"{bitaxe_ip} -> Temperature sensor not responding. Forcing step-down.", "error")
+            if power_consumption > max_watts:
+                log_callback(
+                    f"{bitaxe_ip} -> Power consumption {round(power_consumption, 2)}W exceeds max of {max_watts}W.",
+                    "error")
+            if temp > max_temp:
+                log_callback(f"{bitaxe_ip} -> CPU temp {temp}°C exceeds max of {max_temp}°C.", "error")
+            if vr_temp > max_vr_temp:
+                log_callback(
+                    f"{bitaxe_ip} -> Voltage Regulator temp {vr_temp}°C exceeds limit of {max_vr_temp}°C. Dropping tier.",
+                    "error")
 
-            stepping_down = True # flag to take more time between changes to avoid hashrate falling off cliff
+            stepping_down = True  # flag to take more time between changes to avoid hashrate falling off cliff
 
-            if temp > max_temp or power_consumption > max_watts:
-                log_callback(f"{bitaxe_ip} -> Overheating detected. Tier step-down engaged.", "error")
+            # Drop to next lower tier (if available)
+            tier_freqs = [t["frequency_(mhz)"] for t in tier_list]
+            current_idx = tier_freqs.index(current_frequency) if current_frequency in tier_freqs else -1
+            if current_idx > 0:
+                new_frequency = tier_freqs[current_idx - 1]
+                new_voltage = get_tier_voltage_for_freq(new_frequency, tier_list)
+                log_callback(f"{bitaxe_ip} -> Dropping to tier: {new_frequency} MHz / {new_voltage} mV", "warning")
+            else:
+                log_callback(f"{bitaxe_ip} -> Already at minimum tier. Holding.", "warning")
 
-                # Drop to next lower tier (if available)
-                tier_freqs = [t["frequency_(mhz)"] for t in tier_list]
-                current_idx = tier_freqs.index(current_frequency) if current_frequency in tier_freqs else -1
-                if current_idx > 0:
-                    new_frequency = tier_freqs[current_idx - 1]
-                    new_voltage = get_tier_voltage_for_freq(new_frequency, tier_list)
-                    log_callback(f"{bitaxe_ip} -> Dropping to tier: {new_frequency} MHz / {new_voltage} mV", "warning")
-                else:
-                    log_callback(f"{bitaxe_ip} -> Already at minimum tier. Holding.", "warning")
 
 
         # NEW STEP-UP LOGIC BASED ON EXPECTED VS ACTUAL HASHRATE AND RANGE OF VOLTAGE AND FREQUENCY
@@ -265,7 +274,8 @@ def start_autotuning_all(log_callback):
             miner.get("min_freq"), miner.get("max_freq"),
             miner.get("min_volt"), miner.get("max_volt"),
             miner.get("max_temp"), miner.get("max_watts"),
-            miner.get("start_freq"), miner.get("start_volt")
+            miner.get("start_freq"), miner.get("start_volt"),
+            miner.get("max_vr_temp")
         ))
 
         thread.start()
