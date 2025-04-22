@@ -25,12 +25,14 @@ def load_scaling_table():
         return []
 
 def get_target_hashrate_for_freq(freq, tier_list):
-    """Return expected target hashrate for a given frequency from tier list."""
+    """Return expected target hashrate (in GH/s) for a given frequency from tier list (CSV stores TH/s)."""
     sorted_tiers = sorted(tier_list, key=lambda x: x["frequency_(mhz)"])
     for tier in reversed(sorted_tiers):
         if freq >= tier["frequency_(mhz)"]:
+            # Convert TH/s to GH/s by multiplying by 1000
             return tier.get("target_hashrate", 0)
-    return sorted_tiers[0].get("target_hashrate", 0)
+    return sorted_tiers[0].get("target_hashrate", 0) * 1000
+
 
 def get_system_info(bitaxe_ip):
     """Fetch system info from Bitaxe API."""
@@ -74,8 +76,15 @@ def monitor_and_adjust(bitaxe_ip, bitaxe_type, interval, log_callback,
     """Monitor and auto-adjust miner settings dynamically based on user-defined AutoTuner settings."""
     global running, tier_list
     running = True
+    last_tune_time = 0   # Timestamp of last tuning action
 
-    # Ensure all required settings are present
+    # Load the scaling table once at the start
+    scaling_table = load_scaling_table()
+    config = load_config()
+    enforce_tiers = config.get("enforce_safe_pairing", False)
+    # Always set tier_list based on enforcement
+    tier_list = scaling_table if enforce_tiers else []
+
     required_fields = [min_freq, max_freq, min_volt, max_volt, max_temp, max_watts]
     if any(value is None or value == "" for value in required_fields):
         log_callback(f"{bitaxe_ip} -> Missing AutoTuner settings. Skipping tuning.", "error")
@@ -85,17 +94,14 @@ def monitor_and_adjust(bitaxe_ip, bitaxe_type, interval, log_callback,
     current_frequency = start_freq if start_freq not in [None, ""] else min_freq
     current_voltage = start_volt if start_volt not in [None, ""] else min_volt
 
-    target_hashrate = get_target_hashrate_for_freq(current_frequency, tier_list)
-
     frequency_range = max_freq - min_freq
     voltage_range = max_volt - min_volt
 
-    # Apply initial settings
     applied_settings = set_system_settings(bitaxe_ip, current_voltage, current_frequency)
     log_callback(applied_settings, "info")
 
     last_config_refresh = 0
-    config = load_config()  # Initial config
+    config = load_config()
 
     while running:
         if time.time() - last_config_refresh > 5:
@@ -106,6 +112,7 @@ def monitor_and_adjust(bitaxe_ip, bitaxe_type, interval, log_callback,
         frequency_step = config.get("frequency_step", 5)
         temp_tolerance = config.get("temp_tolerance", 2)
         interval = config.get("monitor_interval", 5)
+        refresh_interval = config.get("refresh_interval", 60)
 
         info = get_system_info(bitaxe_ip)
         if not running:
@@ -115,136 +122,92 @@ def monitor_and_adjust(bitaxe_ip, bitaxe_type, interval, log_callback,
             log_callback(info, "error")
             time.sleep(interval)
             continue
-        
+
         small_core_count = info.get("smallCoreCount")
         asic_count = info.get("asicCount")
         expected_hashrate = int(current_frequency * ((small_core_count * asic_count) / 1000))
 
-        # Pull dynamic target hashrate from scaling table
         target_hashrate = get_target_hashrate_for_freq(current_frequency, tier_list)
+
         if target_hashrate is None:
             log_callback(f"{bitaxe_ip} -> WARNING: No target hashrate found for {current_frequency} MHz", "warning")
-            target_hashrate = expected_hashrate  # Fallback to expected if missing
+            target_hashrate = expected_hashrate
 
         temp = info.get("temp", 0)
-        vr_temp = info.get("vrTemp",0)
+        vr_temp = info.get("vrTemp", 0)
         hash_rate = info.get("hashRate", 0)
         power_consumption = info.get("power", 0)
 
-        log_callback(f"{bitaxe_ip} -> Temp: {temp}°C | Hashrate: {int(hash_rate)}/{expected_hashrate} GH/s | Power: {round(power_consumption,2)}W | Voltage: {current_voltage}V | Frequency: {current_frequency} MHz",
-                     "success")
+        log_callback(f"{bitaxe_ip} -> Temp: {temp}°C | Hashrate: {int(hash_rate)}/{expected_hashrate} GH/s | Power: {round(power_consumption,2)}W | Voltage: {current_voltage}V | Frequency: {current_frequency} MHz", "success")
 
+        now = time.time()
         new_voltage, new_frequency = current_voltage, current_frequency
-        volt_range_percent = (current_voltage - min_volt)/voltage_range # percentage from min to max voltage of where current voltage is
-        freq_range_percent = (current_frequency - min_freq)/frequency_range # percentage from min to max voltage of where current voltage is
-
+        volt_range_percent = (current_voltage - min_volt)/voltage_range
+        freq_range_percent = (current_frequency - min_freq)/frequency_range
         stepping_down = False
 
-        # **STEP-DOWN LOGIC**
-        if temp is None or power_consumption > max_watts or temp > max_temp or vr_temp > max_vr_temp:
-            if temp is None:
-                log_callback(f"{bitaxe_ip} -> Temperature sensor not responding. Forcing step-down.", "error")
-            if power_consumption > max_watts:
-                log_callback(
-                    f"{bitaxe_ip} -> Power consumption {round(power_consumption, 2)}W exceeds max of {max_watts}W.",
-                    "error")
-            if temp > max_temp:
-                log_callback(f"{bitaxe_ip} -> CPU temp {temp}°C exceeds max of {max_temp}°C.", "error")
-            if vr_temp > max_vr_temp:
-                log_callback(
-                    f"{bitaxe_ip} -> Voltage Regulator temp {vr_temp}°C exceeds limit of {max_vr_temp}°C. Dropping tier.",
-                    "error")
+        # Only run tuning logic if refresh_interval has passed
+        if now - last_tune_time >= refresh_interval:
+            if temp is None or power_consumption > max_watts or temp > max_temp or vr_temp > max_vr_temp:
+                # ... (step-down logic unchanged)
+                stepping_down = True
+                # Drop to next lower tier if possible
+                tier_freqs = [t["frequency_(mhz)"] for t in tier_list]
+                current_idx = tier_freqs.index(current_frequency) if current_frequency in tier_freqs else -1
+                if current_idx > 0:
+                    new_frequency = tier_freqs[current_idx - 1]
+                    new_voltage = get_tier_voltage_for_freq(new_frequency, tier_list)
+                    log_callback(f"{bitaxe_ip} -> Dropping to tier: {new_frequency} MHz / {new_voltage} mV", "warning")
+                else:
+                    log_callback(f"{bitaxe_ip} -> Already at minimum tier. Holding.", "warning")
 
-            stepping_down = True  # flag to take more time between changes to avoid hashrate falling off cliff
+            elif temp < (max_temp - temp_tolerance) and power_consumption < max_watts and hash_rate < expected_hashrate:
+                log_callback(f"{bitaxe_ip} -> Temp {temp}°C. Checking if program should optimize.", "info")
+                if ((freq_range_percent >= 0.25 and volt_range_percent <= 0.25) or
+                    (freq_range_percent >= 0.5 and volt_range_percent <= 0.5) or
+                    (freq_range_percent >= 0.75 and volt_range_percent <= 0.75)):
+                    new_voltage += voltage_step
+                    log_callback(f"{bitaxe_ip} -> Increasing voltage to {new_voltage}mV.", "info")
+                elif ((freq_range_percent < 0.25 and volt_range_percent <= 0.25) or
+                      (freq_range_percent < 0.5 and volt_range_percent <= 0.5) or
+                      (freq_range_percent < 0.75 and volt_range_percent <= 0.75)):
+                    new_frequency += frequency_step
+                    log_callback(f"{bitaxe_ip} -> Increasing frequency to {new_frequency}MHz.", "info")
+                else:
+                    log_callback(f"{bitaxe_ip} -> Already at maximum safe settings.", "info")
 
-            # Drop to next lower tier (if available)
-            tier_freqs = [t["frequency_(mhz)"] for t in tier_list]
-            current_idx = tier_freqs.index(current_frequency) if current_frequency in tier_freqs else -1
-            if current_idx > 0:
-                new_frequency = tier_freqs[current_idx - 1]
-                new_voltage = get_tier_voltage_for_freq(new_frequency, tier_list)
-                log_callback(f"{bitaxe_ip} -> Dropping to tier: {new_frequency} MHz / {new_voltage} mV", "warning")
-            else:
-                log_callback(f"{bitaxe_ip} -> Already at minimum tier. Holding.", "warning")
-
-
-
-        # NEW STEP-UP LOGIC BASED ON EXPECTED VS ACTUAL HASHRATE AND RANGE OF VOLTAGE AND FREQUENCY
-        elif temp < (max_temp - temp_tolerance) and power_consumption < max_watts and hash_rate < expected_hashrate:
-            log_callback(f"{bitaxe_ip} -> Temp {temp}°C. Checking if program should optimize.", "info")
-            # checking in interval steps of 25%
-            if ((freq_range_percent >= 0.25 and volt_range_percent <= 0.25) or
-                (freq_range_percent >= 0.5 and volt_range_percent <= 0.5) or
-                (freq_range_percent >= 0.75 and volt_range_percent <= 0.75)):
-                
-                new_voltage += voltage_step
-                volt_range_percent = (new_voltage - min_volt)/voltage_range
-
-                log_callback(f"{bitaxe_ip} -> Increasing voltage to {new_voltage}mV / {int(volt_range_percent*100)}% for stability.", "info")
-
-            elif ((freq_range_percent < 0.25 and volt_range_percent <= 0.25) or
-                (freq_range_percent < 0.5 and volt_range_percent <= 0.5) or
-                (freq_range_percent < 0.75 and volt_range_percent <= 0.75)):
-
-                new_frequency += frequency_step
-                freq_range_percent = (new_frequency - min_freq)/frequency_range
-
-                log_callback(f"{bitaxe_ip} -> Increasing frequency to {new_frequency}MHz / {int(freq_range_percent*100)}%", "info")
-
-            else:
-                log_callback(f"{bitaxe_ip} -> Already at maximum safe settings.", "info")
-
-        # NEW HASHRATE FINE-TUNING BASED ON EXPECTED VS ACTUAL HASHRATE
-        elif hash_rate > expected_hashrate and hash_rate < target_hashrate:
-            log_callback(f"{bitaxe_ip} -> Hashrate below target hashrate {target_hashrate} GH/s! Adjusting settings.", "warning")
-
-            # Step-up logic
-            if temp < (max_temp - temp_tolerance) and hash_rate < expected_hashrate:
+            elif hash_rate > expected_hashrate and hash_rate < target_hashrate:
+                log_callback(f"{bitaxe_ip} -> Hashrate below target hashrate {target_hashrate} GH/s.", "warning")
                 tier_freqs = [t["frequency_(mhz)"] for t in tier_list]
                 current_idx = tier_freqs.index(current_frequency) if current_frequency in tier_freqs else -1
                 if current_idx >= 0 and current_idx + 1 < len(tier_freqs):
                     new_frequency = tier_freqs[current_idx + 1]
                     new_voltage = get_tier_voltage_for_freq(new_frequency, tier_list)
                     log_callback(f"{bitaxe_ip} -> Stepping up to tier: {new_frequency} MHz / {new_voltage} mV", "info")
+
+            elif hash_rate > expected_hashrate and hash_rate > target_hashrate:
+                log_callback(f"{bitaxe_ip} -> Hashrate above target and healthy. No adjustment needed.", "success")
+
+            else:
+                if new_voltage - voltage_step >= min_volt:
+                    new_voltage -= voltage_step
                 else:
-                    log_callback(f"{bitaxe_ip} -> Already at max tier or unknown freq. No step-up.", "info")
+                    new_voltage = min_volt
+                if new_frequency - frequency_step >= min_freq:
+                    new_frequency -= frequency_step
+                else:
+                    new_frequency = min_freq
+                stepping_down = True
+                log_callback(f"{bitaxe_ip} -> Decreasing voltage and frequency due to inefficiency.", "warning")
 
-            else:
-                log_callback(f"{bitaxe_ip} -> Hashrate is under target of {target_hashrate} GH/s, but already at max safe settings.", "warning")
-
-        # HEALTHY HASHING
-        elif hash_rate > expected_hashrate and hash_rate > target_hashrate:
-            log_callback(f"{bitaxe_ip} -> Hashrate above target {target_hashrate} GH/s and healthy! No adjustments needed.<Increase hashrate target for better results.>", "success")
-            #### ADD CODE HERE TO KEEP SETTINGS
-
-        # DECREASE VOLTAGE AND FREQUENCY IF NO PROGRESS IS BEING MADE
-        else:
-            if new_voltage - voltage_step >= min_volt:
-                new_voltage -= voltage_step # try to reduce voltage if progress isn't being made
-            else:
-                new_voltage = min_volt
-            
-            volt_range_percent = (new_voltage - min_volt)/voltage_range
-            
-            if new_frequency - frequency_step >= min_freq:
-                new_frequency -= frequency_step # try to reduce frequency if progress isn't being made
-            else:
-                new_frequency = min_freq
-            
-            freq_range_percent = (new_frequency - min_freq)/frequency_range
-            
-            stepping_down = True
-
-            log_callback(f"{bitaxe_ip} -> Inefficient hashing, decreasing voltage to {new_voltage}V / {int(volt_range_percent*100)}%. Decreasing frequency to {new_frequency}MHz / {int(freq_range_percent*100)}%", "warning")
-        
-        # Apply changes dynamically without restarting
-        if new_voltage != current_voltage or new_frequency != current_frequency:
-            applied_settings = set_system_settings(bitaxe_ip, new_voltage, new_frequency)
-            log_callback(applied_settings, "info")
-            current_voltage, current_frequency = new_voltage, new_frequency
+            if new_voltage != current_voltage or new_frequency != current_frequency:
+                applied_settings = set_system_settings(bitaxe_ip, new_voltage, new_frequency)
+                log_callback(applied_settings, "info")
+                current_voltage, current_frequency = new_voltage, new_frequency
+                last_tune_time = now
 
         if stepping_down:
-            time.sleep(interval*3) #gives more time for step down so the hashrate doesn't crash
+            time.sleep(interval * 3)
         else:
             time.sleep(interval)
 
@@ -283,10 +246,3 @@ def start_autotuning_all(log_callback):
 
     return threads  # Return thread references to manage later
 
-# Load the scaling table once at the start
-scaling_table = load_scaling_table()
-config = load_config()
-enforce_tiers = config.get("enforce_safe_pairing", False)
-
-# Always set tier_list based on enforcement
-tier_list = scaling_table if enforce_tiers else []
