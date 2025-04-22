@@ -39,6 +39,7 @@ def detect_miners(start_ip, end_ip):
                         "max_volt": miner_info.get("max_volt", ""),
                         "max_temp": miner_info.get("max_temp", ""),
                         "max_watts": miner_info.get("max_watts", ""),
+                        "max_vr_temp": miner_info.get("max_vr_temp", ""),  # <- ADD THIS
                         "target_hashrate": miner_info.get("target_hashrate", "")
                     })
                     print(f"Detected miner: {model} at {ip_str}, added as {detected_miners[-1]['nickname']}")
@@ -70,16 +71,17 @@ def save_config(config):
         json.dump(config, file, indent=4)
 
 def get_default_config():
-    """Returns default configuration settings."""
     return {
         "voltage_step": 10,
         "frequency_step": 5,
         "monitor_interval": 5,
         "default_target_temp": 50,
         "temp_tolerance": 2,
-        "refresh_interval": 5,  # Default miner status refresh rate in seconds
+        "refresh_interval": 5,
         "enforce_safe_pairing": True,
-        "miners": []  # No predefined models, settings are per miner
+        "daily_reset_enabled": False,
+        "daily_reset_time": "03:00",
+        "miners": []
     }
 
 def get_miner_defaults(miner_ip):
@@ -111,6 +113,7 @@ def add_miner(miner_type, ip, nickname=""):
         "start_volt": "",
         "max_temp": "",
         "max_watts": "",
+        "max_vr_temp": "",  # <- ADD THIS
         "target_hashrate": ""
     }
 
