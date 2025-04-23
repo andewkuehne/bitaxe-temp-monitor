@@ -26,6 +26,9 @@ def load_scaling_table():
 
 def get_target_hashrate_for_freq(freq, tier_list):
     """Return expected target hashrate (in GH/s) for a given frequency from tier list (CSV stores TH/s)."""
+    if not tier_list:
+        return 0  # Prevents IndexError when enforcement is disabled
+
     sorted_tiers = sorted(tier_list, key=lambda x: x["frequency_(mhz)"])
     for tier in reversed(sorted_tiers):
         if freq >= tier["frequency_(mhz)"]:
@@ -245,4 +248,3 @@ def start_autotuning_all(log_callback):
         threads.append(thread)
 
     return threads  # Return thread references to manage later
-
