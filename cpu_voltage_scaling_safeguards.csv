@@ -1,4 +1,4 @@
-Frequency (MHz),Core Voltage,target_hashrate
+Frequency (MHz),voltage,target_hashrate
 500,1079,1020.0
 505,1081,1030.2
 510,1083,1040.4
