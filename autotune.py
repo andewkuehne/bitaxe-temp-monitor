@@ -78,6 +78,7 @@ def monitor_and_adjust(bitaxe_ip, bitaxe_type, interval, log_callback,
                        max_temp, max_watts, start_freq=None, start_volt=None, max_vr_temp=None):
     """Monitor and auto-adjust miner settings dynamically based on user-defined AutoTuner settings."""
     global running, tier_list
+
     running = True
     last_tune_time = 0   # Timestamp of last tuning action
 
@@ -87,6 +88,11 @@ def monitor_and_adjust(bitaxe_ip, bitaxe_type, interval, log_callback,
     enforce_tiers = config.get("enforce_safe_pairing", False)
     # Always set tier_list based on enforcement
     tier_list = scaling_table if enforce_tiers else []
+
+    # Flatline detection
+    hashrate_history = []
+    flatline_repeat_count = config.get("flatline_hashrate_repeat_count", 5)
+    flatline_enabled = config.get("flatline_detection_enabled", True)
 
     required_fields = [min_freq, max_freq, min_volt, max_volt, max_temp, max_watts]
     if any(value is None or value == "" for value in required_fields):
@@ -140,6 +146,18 @@ def monitor_and_adjust(bitaxe_ip, bitaxe_type, interval, log_callback,
         vr_temp = info.get("vrTemp", 0)
         hash_rate = info.get("hashRate", 0)
         power_consumption = info.get("power", 0)
+
+        # Track flatline hashrate history
+        hashrate_history.append(hash_rate)
+        if len(hashrate_history) > flatline_repeat_count:
+            hashrate_history.pop(0)
+
+        if flatline_enabled and len(set(hashrate_history)) == 1 and len(hashrate_history) == flatline_repeat_count:
+            log_callback(f"{bitaxe_ip} -> Flatline detected ({hash_rate} GH/s). Restarting...", "error")
+            restart_bitaxe(bitaxe_ip)
+            hashrate_history.clear()
+            time.sleep(60)  # Allow reboot cooldown
+            continue  # Skip tuning for this cycle
 
         log_callback(f"{bitaxe_ip} -> Temp: {temp}°C | Hashrate: {int(hash_rate)}/{expected_hashrate} GH/s | Power: {round(power_consumption,2)}W | Voltage: {current_voltage}V | Frequency: {current_frequency} MHz", "success")
 
@@ -248,3 +266,4 @@ def start_autotuning_all(log_callback):
         threads.append(thread)
 
     return threads  # Return thread references to manage later
+
