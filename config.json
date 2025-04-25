@@ -1,12 +1,14 @@
 {
     "voltage_step": 10,
     "frequency_step": 5,
-    "monitor_interval": 10,
+    "monitor_interval": 5,
     "default_target_temp": 50,
     "temp_tolerance": 2,
-    "refresh_interval": 10,
-    "max_vr_temp": 85
-    "daily_reset_enabled": true,
+    "refresh_interval": 5,
+    "enforce_safe_pairing": true,
+    "daily_reset_enabled": false,
     "daily_reset_time": "03:00",
+    "flatline_detection_enabled": true,
+    "flatline_hashrate_repeat_count": 5
     "miners": []
 }
