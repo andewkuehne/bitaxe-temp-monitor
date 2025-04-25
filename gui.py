@@ -304,16 +304,18 @@ class BitaxeAutotuningApp:
         new_frequency = miner_data.get("frequency", "-")
         new_voltage = miner_data.get("coreVoltage", "-")
         new_temp = f"{miner_data.get('temp', '-')}°C"
+        new_vr_temp = f"{miner_data.get('vrTemp', '-')}°C"
         new_hashrate = f"{float(miner_data.get('hashRate', 0)):.2f} GH/s"
         new_power = f"{float(miner_data.get('power', 0)):.2f} W"
 
-        # Update only the selected miner's row
+        # Update all 9 values in-place
         updated_values = list(values)
-        updated_values[3] = new_frequency  # Applied Frequency
-        updated_values[4] = new_voltage  # Current Voltage
-        updated_values[5] = new_temp  # Current Temp
-        updated_values[6] = new_hashrate  # Current Hash Rate
-        updated_values[7] = new_power  # Current Power Usage
+        updated_values[3] = new_frequency  # Applied Freq
+        updated_values[4] = new_voltage  # Voltage
+        updated_values[5] = new_temp  # Temp
+        updated_values[6] = new_vr_temp  # VR Temp
+        updated_values[7] = new_hashrate  # Hash Rate
+        updated_values[8] = new_power  # Power
 
         self.tree.item(selected_item, values=updated_values)
 
@@ -388,7 +390,7 @@ class BitaxeAutotuningApp:
 
         self.global_settings_window = tk.Toplevel(self.root)
         self.global_settings_window.title("Global Settings")
-        self.global_settings_window.geometry("650x425")
+        self.global_settings_window.geometry("650x500")
         self.global_settings_window.iconbitmap(resource_path("bitaxe_icon.ico"))
         self.global_settings_window.config(bg="white")
 
@@ -403,6 +405,8 @@ class BitaxeAutotuningApp:
                 new_settings["enforce_safe_pairing"] = enforce_var.get()
                 new_settings["daily_reset_enabled"] = reset_var.get()
                 new_settings["daily_reset_time"] = time_entry.get().strip()
+                new_settings["flatline_detection_enabled"] = flatline_var.get()
+                new_settings["flatline_hashrate_repeat_count"] = int(flatline_entry.get())
                 config.update(new_settings)
                 save_config(config)
                 messagebox.showinfo("Success", "Settings updated successfully.")
@@ -470,6 +474,20 @@ class BitaxeAutotuningApp:
         time_entry = tk.Entry(self.global_settings_window, font=("Arial", 10), width=10)
         time_entry.insert(0, config.get("daily_reset_time", "03:00"))
         time_entry.pack(pady=2)
+
+        flatline_var = tk.BooleanVar(value=config.get("flatline_detection_enabled", True))
+        flatline_checkbox = tk.Checkbutton(self.global_settings_window,
+                                           text="Enable Flatline Hashrate Detection",
+                                           variable=flatline_var,
+                                           font=("Arial", 10), bg="white")
+        flatline_checkbox.pack(pady=5)
+
+        tk.Label(self.global_settings_window, text="Flatline Repeat Count (e.g. 5):", font=("Arial", 10),
+                 bg="white").pack()
+        flatline_entry = tk.Entry(self.global_settings_window, font=("Arial", 10), width=10)
+        flatline_entry.insert(0, str(config.get("flatline_hashrate_repeat_count", 5)))
+        flatline_entry.pack(pady=2)
+
 
         tk.Button(self.global_settings_window, text="Save", font=("Arial", 10), width=10, bg="gold", command=save_global_settings).pack(pady=10)
 
@@ -662,6 +680,7 @@ class BitaxeAutotuningApp:
             updated_miners.append(updated_miner)
 
         config["miners"] = updated_miners  # Replace old miner data with updated values
+
         save_config(config)  # Save back to config.json
 
         self.log_message("Tuning & miner settings have been saved to config.json.", "success")
