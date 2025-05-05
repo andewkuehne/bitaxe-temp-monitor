@@ -87,9 +87,9 @@ The app aims to maximize the miner's hash rate while maintaining stable and safe
 
    ```bash
    	sudo apt update
-	sudo apt install -y python3 python3-pip python3-tk
+   	sudo apt install -y python3 python3-pip python3-tk
    	pip3 install --upgrade pip
-	pip3 install pandas requests
+   	pip3 install pandas requests
    ```
    
 4. Run the application:
