@@ -73,6 +73,31 @@ The app aims to maximize the miner's hash rate while maintaining stable and safe
 	python3 main.py
    ```
 
+### For Raspberry Pi (RPi 5) 
+
+1. Open terminal window
+2. Clone the repository:
+
+   ```bash
+	git clone https://github.com/hurllz/bitaxe-temp-monitor.git
+	cd bitaxe-temp-monitor
+   ```
+
+2. Install dependencies:
+
+   ```bash
+   	sudo apt update
+	sudo apt install -y python3 python3-pip python3-tk
+   	pip3 install --upgrade pip
+	pip3 install pandas requests
+   ```
+   
+4. Run the application:
+
+   ```bash
+	python3 main.py
+   ```
+
 ## Usage
 
 To start the app, provide the IP address of your Bitaxe miner. You can specify initial voltage, frequency, target temperature, and the interval for autotuning.
