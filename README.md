@@ -41,7 +41,7 @@ The app aims to maximize the miner's hash rate while maintaining stable and safe
 3. Install dependencies:
 
    ```bash
-	pip install requests
+	pip install requests pandas
    ```
    
 4. Run the application:
@@ -64,7 +64,7 @@ The app aims to maximize the miner's hash rate while maintaining stable and safe
 
    ```bash
 	sudo apt-get install python3-tk
-	pip install requests
+	pip3 install requests pandas
    ```
    
 4. Run the application:
