@@ -8,6 +8,7 @@ import os
 import sys
 import time
 import webbrowser
+import platform
 
 
 def resource_path(relative_path):
@@ -23,7 +24,10 @@ class BitaxeAutotuningApp:
         self.root = tk.Tk()
         self.root.title("Bitaxe Multi Autotuner")
         self.root.geometry("1300x700")
-        self.root.iconbitmap(resource_path("bitaxe_icon.ico"))
+
+        if platform.system() == "Windows":
+            self.root.iconbitmap(resource_path("bitaxe_icon.ico"))
+
         self.root.config(bg="black")
         self.root.resizable(True, True)
 
@@ -162,7 +166,8 @@ class BitaxeAutotuningApp:
         scan_window = tk.Toplevel(self.root)
         scan_window.title("Scan Network")
         scan_window.geometry("400x200")
-        scan_window.iconbitmap(resource_path("bitaxe_icon.ico"))
+        if platform.system() == "Windows":
+            scan_window.iconbitmap(resource_path("bitaxe_icon.ico"))
         scan_window.config(bg="white")
 
         tk.Label(scan_window, text="Enter IP Range to Scan", font=("Arial", 12, "bold"), bg="white").pack(pady=10)
@@ -219,7 +224,8 @@ class BitaxeAutotuningApp:
         add_window = tk.Toplevel(self.root)
         add_window.title("Add Miner")
         add_window.geometry("400x200")
-        add_window.iconbitmap(resource_path("bitaxe_icon.ico"))
+        if platform.system() == "Windows":
+            add_window.iconbitmap(resource_path("bitaxe_icon.ico"))
         add_window.config(bg="white")
 
         tk.Label(add_window, text="Nickname:", bg="white", font=("Arial", 10)).grid(row=0, column=0, sticky="w",
@@ -391,7 +397,8 @@ class BitaxeAutotuningApp:
         self.global_settings_window = tk.Toplevel(self.root)
         self.global_settings_window.title("Global Settings")
         self.global_settings_window.geometry("650x500")
-        self.global_settings_window.iconbitmap(resource_path("bitaxe_icon.ico"))
+        if platform.system() == "Windows":
+            self.global_settings_window.iconbitmap(resource_path("bitaxe_icon.ico"))
         self.global_settings_window.config(bg="white")
 
         def on_close():
@@ -507,7 +514,8 @@ class BitaxeAutotuningApp:
         self.autotuner_window = tk.Toplevel(self.root)
         self.autotuner_window.title("AutoTuner Settings")
         self.autotuner_window.geometry("1250x500")
-        self.autotuner_window.iconbitmap(resource_path("bitaxe_icon.ico"))
+        if platform.system() == "Windows":
+            self.autotuner_window.iconbitmap(resource_path("bitaxe_icon.ico"))
         self.autotuner_window.config(bg="white")
 
         def on_close():
