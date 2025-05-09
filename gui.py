@@ -26,7 +26,10 @@ class BitaxeAutotuningApp:
         self.root.geometry("1300x700")
 
         if platform.system() == "Windows":
-            self.root.iconbitmap(resource_path("bitaxe_icon.ico"))
+            try:
+                self.root.iconbitmap(resource_path("bitaxe_icon.ico"))
+            except:
+                pass # Icon loading can silently fail if not found or invalid
 
         self.root.config(bg="black")
         self.root.resizable(True, True)
@@ -167,7 +170,11 @@ class BitaxeAutotuningApp:
         scan_window.title("Scan Network")
         scan_window.geometry("400x200")
         if platform.system() == "Windows":
-            scan_window.iconbitmap(resource_path("bitaxe_icon.ico"))
+            try:
+                scan_window.iconbitmap(resource_path("bitaxe_icon.ico"))
+            except:
+                pass  # Icon loading can silently fail if not found or invalid
+
         scan_window.config(bg="white")
 
         tk.Label(scan_window, text="Enter IP Range to Scan", font=("Arial", 12, "bold"), bg="white").pack(pady=10)
@@ -225,7 +232,11 @@ class BitaxeAutotuningApp:
         add_window.title("Add Miner")
         add_window.geometry("400x200")
         if platform.system() == "Windows":
-            add_window.iconbitmap(resource_path("bitaxe_icon.ico"))
+            try:
+                add_window.iconbitmap(resource_path("bitaxe_icon.ico"))
+            except:
+                pass  # Icon loading can silently fail if not found or invalid
+
         add_window.config(bg="white")
 
         tk.Label(add_window, text="Nickname:", bg="white", font=("Arial", 10)).grid(row=0, column=0, sticky="w",
@@ -388,6 +399,8 @@ class BitaxeAutotuningApp:
 
         tk.Button(edit_window, text="Save", font=("Arial", 10), command=save_miner_settings, bg="gold").pack(pady=10)
 
+    import platform  # Ensure this is imported at the top of your file
+
     def open_global_settings(self):
         """Opens a settings window for modifying global autotuner parameters."""
         if self.global_settings_window and tk.Toplevel.winfo_exists(self.global_settings_window):
@@ -397,8 +410,15 @@ class BitaxeAutotuningApp:
         self.global_settings_window = tk.Toplevel(self.root)
         self.global_settings_window.title("Global Settings")
         self.global_settings_window.geometry("650x500")
+
+        # Platform-safe icon handling
         if platform.system() == "Windows":
-            self.global_settings_window.iconbitmap(resource_path("bitaxe_icon.ico"))
+            try:
+                self.global_settings_window.iconbitmap(resource_path("bitaxe_icon.ico"))
+            except:
+                pass  # Skip icon if loading fails
+
+
         self.global_settings_window.config(bg="white")
 
         def on_close():
@@ -424,10 +444,14 @@ class BitaxeAutotuningApp:
 
         self.global_settings_window.protocol("WM_DELETE_WINDOW", on_close)
 
-        tk.Label(self.global_settings_window, text="Modify Settings", font=("Arial", 12, "bold"), bg="white").pack(
-            pady=10)
+        tk.Label(
+            self.global_settings_window,
+            text="Modify Settings",
+            font=("Arial", 12, "bold"),
+            bg="white",
+            fg="black"
+        ).pack(pady=10)
 
-        # Load current settings
         config = load_config()
 
         settings_entries = {}
@@ -440,7 +464,6 @@ class BitaxeAutotuningApp:
             "refresh_interval": "Autotuner Update Interval (sec):"
         }
 
-        # Create input fields
         input_frame = tk.Frame(self.global_settings_window, bg="white")
         input_frame.pack(padx=20, pady=10, fill=tk.X)
 
@@ -448,55 +471,89 @@ class BitaxeAutotuningApp:
             row_frame = tk.Frame(input_frame, bg="white")
             row_frame.pack(fill=tk.X, pady=2)
 
-            tk.Label(row_frame, text=label_text, font=("Arial", 11), bg="white").pack(side=tk.LEFT)
+            tk.Label(row_frame, text=label_text, font=("Arial", 11), bg="white", fg="black").pack(side=tk.LEFT)
 
-            entry = tk.Entry(row_frame, font=("Arial", 11), width=10)
+            entry = tk.Entry(row_frame, font=("Arial", 11), width=10, bg="white", fg="black", insertbackground="black")
             entry.insert(0, str(config.get(key, "")))
             entry.pack(side=tk.RIGHT, padx=10)
             settings_entries[key] = entry
 
-        # Add checkbox for tier enforcement
         enforce_var = tk.BooleanVar(value=config.get("enforce_safe_pairing", False))
-        tier_checkbox = tk.Checkbutton(self.global_settings_window,
-                                       text="Enforce Safe Frequency/Voltage Tiers (from 'cpu_voltage_scaling_safeguards.xlsx')",
-                                       variable=enforce_var,
-                                       font=("Arial", 10),
-                                       bg="white")
+        tier_checkbox = tk.Checkbutton(
+            self.global_settings_window,
+            text="Enforce Safe Frequency/Voltage Tiers (from 'cpu_voltage_scaling_safeguards.xlsx')",
+            variable=enforce_var,
+            font=("Arial", 10),
+            bg="white",
+            fg="black",
+            selectcolor="white",
+            activebackground="white",
+            activeforeground="black"
+        )
         tier_checkbox.pack(pady=5)
 
-        # Daily Reset Checkbox and Time Entry
         reset_var = tk.BooleanVar(value=config.get("daily_reset_enabled", False))
-        reset_checkbox = tk.Checkbutton(self.global_settings_window,
-                                        text="Enable Daily Miner Reset", variable=reset_var,
-                                        font=("Arial", 10), bg="white")
+        reset_checkbox = tk.Checkbutton(
+            self.global_settings_window,
+            text="Enable Daily Miner Reset",
+            variable=reset_var,
+            font=("Arial", 10),
+            bg="white",
+            fg="black",
+            selectcolor="white",
+            activebackground="white",
+            activeforeground="black"
+        )
         reset_checkbox.pack(pady=5)
 
-        time_label = tk.Label(
+        tk.Label(
             self.global_settings_window,
             text="Daily Reset Time (HH:MM, 24-hour format):",
             font=("Arial", 10),
-            bg="white"
-        )
-        time_label.pack()
-        time_entry = tk.Entry(self.global_settings_window, font=("Arial", 10), width=10)
+            bg="white",
+            fg="black"
+        ).pack()
+        time_entry = tk.Entry(self.global_settings_window, font=("Arial", 10), width=10, bg="white", fg="black",
+                              insertbackground="black")
         time_entry.insert(0, config.get("daily_reset_time", "03:00"))
         time_entry.pack(pady=2)
 
         flatline_var = tk.BooleanVar(value=config.get("flatline_detection_enabled", True))
-        flatline_checkbox = tk.Checkbutton(self.global_settings_window,
-                                           text="Enable Flatline Hashrate Detection",
-                                           variable=flatline_var,
-                                           font=("Arial", 10), bg="white")
+        flatline_checkbox = tk.Checkbutton(
+            self.global_settings_window,
+            text="Enable Flatline Hashrate Detection",
+            variable=flatline_var,
+            font=("Arial", 10),
+            bg="white",
+            fg="black",
+            selectcolor="white",
+            activebackground="white",
+            activeforeground="black"
+        )
         flatline_checkbox.pack(pady=5)
 
-        tk.Label(self.global_settings_window, text="Flatline Repeat Count (e.g. 5):", font=("Arial", 10),
-                 bg="white").pack()
-        flatline_entry = tk.Entry(self.global_settings_window, font=("Arial", 10), width=10)
+        tk.Label(
+            self.global_settings_window,
+            text="Flatline Repeat Count (e.g. 5):",
+            font=("Arial", 10),
+            bg="white",
+            fg="black"
+        ).pack()
+        flatline_entry = tk.Entry(self.global_settings_window, font=("Arial", 10), width=10, bg="white", fg="black",
+                                  insertbackground="black")
         flatline_entry.insert(0, str(config.get("flatline_hashrate_repeat_count", 5)))
         flatline_entry.pack(pady=2)
 
+        tk.Button(
+            self.global_settings_window,
+            text="Save",
+            font=("Arial", 10),
+            width=10,
+            bg="gold",
+            command=save_global_settings
+        ).pack(pady=10)
 
-        tk.Button(self.global_settings_window, text="Save", font=("Arial", 10), width=10, bg="gold", command=save_global_settings).pack(pady=10)
+    import platform  # Ensure this is at the top of your file
 
     def open_autotuner_settings(self):
         """Opens a window to modify AutoTuner settings for all miners, with a scrollbar for large lists."""
@@ -514,8 +571,13 @@ class BitaxeAutotuningApp:
         self.autotuner_window = tk.Toplevel(self.root)
         self.autotuner_window.title("AutoTuner Settings")
         self.autotuner_window.geometry("1250x500")
+
         if platform.system() == "Windows":
-            self.autotuner_window.iconbitmap(resource_path("bitaxe_icon.ico"))
+            try:
+                self.autotuner_window.iconbitmap(resource_path("bitaxe_icon.ico"))
+            except:
+                pass  # Icon loading can silently fail if not found or invalid
+
         self.autotuner_window.config(bg="white")
 
         def on_close():
@@ -524,8 +586,8 @@ class BitaxeAutotuningApp:
 
         self.autotuner_window.protocol("WM_DELETE_WINDOW", on_close)
 
-        tk.Label(self.autotuner_window, text="Modify AutoTuner Settings", font=("Arial", 12, "bold"), bg="white").pack(
-            pady=10)
+        tk.Label(self.autotuner_window, text="Modify AutoTuner Settings", font=("Arial", 12, "bold"), bg="white",
+                 fg="black").pack(pady=10)
 
         container = tk.Frame(self.autotuner_window, bg="white")
         container.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
@@ -547,23 +609,21 @@ class BitaxeAutotuningApp:
         headers = ["Enable", "Miner", "Min Freq", "Max Freq", "Start Freq", "Min Volt", "Max Volt", "Start Volt",
                    "Max Temp", "Max Watts", "Max VR Temp", "Actions"]
 
-        # Create table headers
         for col_idx, header in enumerate(headers):
-            tk.Label(scrollable_frame, text=header, font=("Arial", 10, "bold"), bg="white").grid(
+            tk.Label(scrollable_frame, text=header, font=("Arial", 10, "bold"), bg="white", fg="black").grid(
                 row=0, column=col_idx, padx=5, pady=5
             )
 
         settings_entries = {}
-        selected_miners = {}  # Track enabled/disabled miners
-        clipboard = {}  # Stores copied row data
+        selected_miners = {}
+        clipboard = {}
+        enable_checkboxes = {}
 
         def copy_row(row_idx):
-            """Copies values from the selected row into clipboard."""
             nonlocal clipboard
             clipboard = {field: settings_entries[row_idx][field].get() for field in settings_entries[row_idx]}
 
         def paste_row(row_idx):
-            """Pastes values from the clipboard into the selected row."""
             if not clipboard:
                 messagebox.showwarning("No Data", "No row has been copied yet.")
                 return
@@ -573,31 +633,25 @@ class BitaxeAutotuningApp:
                     entry.delete(0, tk.END)
                     entry.insert(0, clipboard[field])
 
-            validate_miner_settings(row_idx)  # Recheck if miner can be enabled after pasting
+            validate_miner_settings(row_idx)
 
         def validate_miner_settings(row_idx):
-            """Checks if all required values are filled and enables/disables the checkbox accordingly."""
             has_empty_values = any(entry.get() == "" for entry in settings_entries[row_idx].values())
-
             if has_empty_values:
                 selected_miners[row_idx].set(False)
                 enable_checkboxes[row_idx].config(state=tk.DISABLED)
             else:
                 enable_checkboxes[row_idx].config(state=tk.NORMAL)
 
-        enable_checkboxes = {}  # Store references to checkboxes
-
-        # Populate rows with miner data
         for row_idx, miner in enumerate(miners, start=1):
-            # Checkbox to enable/disable miner
             var = tk.BooleanVar(value=miner.get("enabled", False))
-            chk = tk.Checkbutton(scrollable_frame, variable=var, bg="white")
+            chk = tk.Checkbutton(scrollable_frame, variable=var, bg="white", fg="black", selectcolor="white",
+                                 activebackground="white", activeforeground="black")
             chk.grid(row=row_idx, column=0, padx=5, pady=5)
             selected_miners[row_idx] = var
             enable_checkboxes[row_idx] = chk
 
-            # Miner Nickname & IP
-            tk.Label(scrollable_frame, text=f"{miner['nickname']} ({miner['ip']})", bg="white",
+            tk.Label(scrollable_frame, text=f"{miner['nickname']} ({miner['ip']})", bg="white", fg="black",
                      font=("Arial", 10)).grid(row=row_idx, column=1, padx=5, pady=5, sticky="w")
 
             fields = ["min_freq", "max_freq", "start_freq", "min_volt", "max_volt",
@@ -606,17 +660,14 @@ class BitaxeAutotuningApp:
             miner_settings = {}
 
             for col_idx, field in enumerate(fields, start=2):
-                entry = tk.Entry(scrollable_frame, bg="white", width=10)
+                entry = tk.Entry(scrollable_frame, bg="white", fg="black", insertbackground="black", width=10)
                 entry.insert(0, miner.get(field, ""))
                 entry.grid(row=row_idx, column=col_idx, padx=5, pady=5)
                 miner_settings[field] = entry
-
-                # Bind validation function to detect changes
                 entry.bind("<KeyRelease>", lambda event, idx=row_idx: validate_miner_settings(idx))
 
             settings_entries[row_idx] = miner_settings
 
-            # **Add Copy and Paste Buttons**
             copy_button = tk.Button(scrollable_frame, text="Copy", font=("Arial", 8), width=10,
                                     command=lambda idx=row_idx: copy_row(idx))
             paste_button = tk.Button(scrollable_frame, text="Paste", font=("Arial", 8), width=10,
@@ -625,17 +676,13 @@ class BitaxeAutotuningApp:
             copy_button.grid(row=row_idx, column=len(fields) + 2, padx=2, pady=5)
             paste_button.grid(row=row_idx, column=len(fields) + 3, padx=2, pady=5)
 
-            # Validate miner settings initially
             validate_miner_settings(row_idx)
 
         def save_autotuner_settings():
-            """Save the modified AutoTuner settings to config.json."""
             for idx, miner in enumerate(config["miners"], start=1):
                 if idx in settings_entries:
                     for field, entry in settings_entries[idx].items():
                         miner[field] = int(entry.get()) if entry.get().isdigit() else ""
-
-                # Store the selection status
                 miner["enabled"] = selected_miners[idx].get()
 
             save_config(config)
@@ -644,9 +691,7 @@ class BitaxeAutotuningApp:
             self.autotuner_window.destroy()
 
         tk.Button(self.autotuner_window, text="Save", font=("Arial", 10), width=10, bg="gold",
-                  command=save_autotuner_settings).pack(
-            pady=10
-        )
+                  command=save_autotuner_settings).pack(pady=10)
 
     def save_settings(self):
         """Saves all miner tuning settings and miner details to config.json."""
