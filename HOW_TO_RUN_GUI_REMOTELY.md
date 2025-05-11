@@ -6,9 +6,11 @@ This guide explains how to run the Bitaxe Temp Monitor & Auto-Tuner GUI remotely
 
 ## Prerequisites
 
-- A headless Raspberry Pi running Raspberry Pi OS (or any Debian-based Linux).
-- SSH access to the Pi from a local Linux/macOS machine.
-- X11 server running on the local machine (macOS users should install [XQuartz](https://www.xquartz.org/)).
+- A headless Raspberry Pi running Raspberry Pi OS (or any Debian-based Linux)
+- SSH access to the Pi from a local Linux/macOS machine
+- An X11 server running on the local machine:
+  - **macOS** users: install [XQuartz](https://www.xquartz.org)
+  - **Linux**: X11 is usually pre-installed
 
 ---
 
@@ -45,7 +47,9 @@ Then restart the SSH service:
 
 ## Step 2: Prepare Your Local Machine
 macOS Users
-Install and launch XQuartz, then log out and log back in for changes to take effect.
+1. Install and launch XQuartz
+2. Launch XQuartz manually (first time)
+3. Log out and log back into your macOS user account for permissions to apply
 
 Linux Users
 X11 is typically installed by default. You’re good to go.
@@ -76,6 +80,21 @@ Once logged in, navigate to the Bitaxe project folder:
   ```
 
 The GUI will launch and appear on your local machine while running from the Pi.
+
+## If You MUST Use sudo (e.g., root-only access)
+
+Using sudo breaks X11 forwarding unless permissions are granted:
+
+  ```bash
+  xhost +SI:localuser:root
+  ```
+Then run the GUI with sudo:
+
+```bash
+sudo python3 main.py
+```
+⚠️ This is rarely needed and not recommended unless absolutely required.
+
 
 ## Troubleshooting
 If you see an error like TclError: no display name and no $DISPLAY environment variable, X11 forwarding is not active. Ensure you connected using ssh -X and that X11 is installed on both systems.
