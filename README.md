@@ -37,7 +37,7 @@ The app aims to maximize the miner's hash rate while maintaining stable and safe
 
 ## Installation
 
-### ｪWindows
+### 🪟 Windows
 
 1.  Open Command Prompt as Administrator.
 
@@ -56,7 +56,7 @@ The app aims to maximize the miner's hash rate while maintaining stable and safe
 
 -----
 
-### 克 macOS
+### 🍎 macOS
 
 1.  Open a terminal window.
 
@@ -103,7 +103,7 @@ The app aims to maximize the miner's hash rate while maintaining stable and safe
 
 -----
 
-### 制 Linux
+### 🐧 Linux
 
 1.  Open a terminal window.
 
@@ -123,7 +123,7 @@ The app aims to maximize the miner's hash rate while maintaining stable and safe
 
 -----
 
-### 酷 Raspberry Pi (RPi 5)
+### 🍓 Raspberry Pi (RPi 5)
 
 1.  Open a terminal window.
 
